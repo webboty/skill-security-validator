@@ -10,14 +10,26 @@
 
 ---
 
-## 🎯 AIDA Pitch
+## 🎯 Why You ABSOLUTELY Need This Skill!
 
-### Attention
+### The Threat Is Real
 **Your AI agent just installed a malicious skill.**
 
 What if that "helpful" third-party skill contained a trojan? A keylogger? A reverse shell? With 341+ malicious skills discovered in 2025 alone (the ClawHavoc incident), blindly trusting skills is no longer safe.
 
-### Interest
+### The Problem
+Every time you install a skill from GitHub, ClawHub, or any marketplace, you're trusting code written by strangers. That "handy automation skill" could be:
+
+- 😈 **Stealing your API keys and credentials**
+- 🦠 **Installing malware on your machine**
+- 👁️ **Keylogging everything you type**
+- 📡 **Opening backdoors for attackers**
+- ⛏️ **Using your GPU for crypto mining**
+- 📡 **Exfiltrating your data to attacker's servers**
+
+**You wouldn't install random executables from the internet. Why trust random AI skills?**
+
+### The Solution
 **Meet Skill Security Validator**
 
 The only security scanner built specifically for AI agent skills and scripts. It detects:
@@ -31,38 +43,20 @@ The only security scanner built specifically for AI agent skills and scripts. It
 
 **200+ detection patterns** covering the entire attack kill chain.
 
-### Desire
-**Why risk it?**
-
-```bash
-# Before installing ANY skill:
-python3 validate_security.py /path/to/new-skill
-```
-
-**What you get:**
-- ✅ Instant security scan in seconds
-- ✅ Clear risk score: SAFE / LOW / MEDIUM / HIGH / CRITICAL
-- ✅ Detailed findings with line numbers
-- ✅ Actionable recommendations
-- ✅ Zero false positives on legitimate skills
+### Why You'll Love It
+- ✅ **Instant security scan** - Get results in seconds
+- ✅ **Clear risk scoring** - SAFE → LOW → MEDIUM → HIGH → CRITICAL
+- ✅ **Detailed findings** - Line numbers and explanations
+- ✅ **Actionable recommendations** - Know exactly what to do
+- ✅ **No false alarms** - Legitimate skills pass with no issues
+- ✅ **Zero setup** - Just run and get results
 
 **Used by security-conscious developers who:**
 - Install skills from untrusted sources
 - Evaluate open-source skills before use
 - Audit internal skill libraries
 - Verify skill supply chain
-
-### Action
-**Install now - it's free:**
-
-```bash
-git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
-```
-
-**Then validate any skill before installing:**
-```bash
-python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py /path/to/skill-to-validate
-```
+- Run CI/CD security gates
 
 ---
 
@@ -77,6 +71,49 @@ python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py 
 | **Package Install Detection** | Warns about pip, npm, apt, brew installations |
 | **Risk Scoring** | Quantified risk level from SAFE to CRITICAL |
 | **Multi-Language** | Python, JavaScript, TypeScript, Bash, Go, Rust, Java |
+
+---
+
+## 🤖 OpenCode Integration
+
+**The skill works directly inside OpenCode!**
+
+### Option 1: Tell Your Agent
+Just tell OpenCode to validate a skill:
+
+> "Validate this skill for security issues: /path/to/skill"
+
+> "Run security check on the skill at ~/skills/new-skill"
+
+> "Is this skill safe? Check ~/downloads/some-skill for malware"
+
+OpenCode will automatically use the skill-security-validator to scan and report findings.
+
+### Option 2: Use the Dropdown
+1. Type `/skills` in OpenCode
+2. Select "skill-security-validator" from the dropdown
+3. Tell it which skill to validate
+
+### Option 3: Direct Command
+```bash
+python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py /path/to/skill
+```
+
+---
+
+## ⚡ Quick Start
+
+### Install
+```bash
+git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
+```
+
+### Validate Any Skill
+```bash
+python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py /path/to/skill-to-validate
+```
+
+**Before installing ANY new skill, run the validator first!**
 
 ---
 
@@ -168,7 +205,7 @@ Found a new attack pattern? PRs welcome!
 
 ---
 
-## �License
+## 📜 License
 
 MIT - Free to use, modify, and distribute.
 
