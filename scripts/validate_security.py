@@ -520,12 +520,185 @@ class SecurityValidator:
             return "CRITICAL RISK - Strongly recommend NOT using this skill/script."
 
 
+def get_home_dir():
+    """Get the user's home directory cross-platform."""
+    return Path.home()
+
+
+def get_skill_locations():
+    """Get all known skill locations for different AI agents and OS."""
+    home = get_home_dir()
+    is_windows = sys.platform == "win32"
+
+    if is_windows:
+        userprofile = Path(os.environ.get("USERPROFILE", str(home)))
+        appdata = Path(
+            os.environ.get("APPDATA", str(userprofile / "AppData" / "Roaming"))
+        )
+
+        locations = [
+            (userprofile / ".claude" / "skills", "Claude Code (global)"),
+            (userprofile / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
+            (appdata / "opencode" / "skills", "OpenCode (config)"),
+            (userprofile / ".cursor" / "rules", "Cursor (rules)"),
+            (userprofile / "kilocode" / "skills", "KiloCode"),
+        ]
+    else:
+        locations = [
+            (home / ".claude" / "skills", "Claude Code (global)"),
+            (home / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
+            (home / ".config" / "opencode" / "skills", "OpenCode (config)"),
+            (home / ".cursor" / "rules", "Cursor (rules)"),
+            (home / ".kilocode" / "skills", "KiloCode"),
+        ]
+
+    valid_locations = [(p, name) for p, name in locations if p.exists()]
+    return valid_locations
+
+
+def find_skill_by_name(skill_name: str) -> List[Path]:
+    """Find a skill by name across all known locations."""
+    locations = get_skill_locations()
+    found_paths = []
+
+    for base_path, location_name in locations:
+        skill_path = base_path / skill_name
+        if skill_path.exists():
+            found_paths.append(skill_path)
+
+        for subdir in base_path.iterdir() if base_path.exists() else []:
+            if subdir.is_dir() and subdir.name.lower() == skill_name.lower():
+                found_paths.append(subdir)
+
+    return found_paths
+
+
+def list_all_skills() -> Dict[str, List[Dict[str, str]]]:
+    """List all skills found in all known locations."""
+    locations = get_skill_locations()
+    all_skills = {}
+
+    for base_path, location_name in locations:
+        if not base_path.exists():
+            continue
+
+        skills = []
+        for item in base_path.iterdir():
+            if item.is_dir():
+                skill_file = item / "SKILL.md"
+                if skill_file.exists():
+                    skills.append(
+                        {
+                            "name": item.name,
+                            "path": str(item),
+                            "location": location_name,
+                        }
+                    )
+                elif (item / "skill.md").exists():
+                    skills.append(
+                        {
+                            "name": item.name,
+                            "path": str(item),
+                            "location": location_name,
+                        }
+                    )
+
+        if skills:
+            all_skills[location_name] = skills
+
+    return all_skills
+
+
+def scan_all_skills() -> Dict[str, Any]:
+    """Scan all skills found in all known locations."""
+    all_skills = list_all_skills()
+    results = {
+        "scanned_locations": [],
+        "total_skills": 0,
+        "skills": [],
+        "summary": {"safe": 0, "low": 0, "medium": 0, "high": 0, "critical": 0},
+    }
+
+    for location_name, skills in all_skills.items():
+        results["scanned_locations"].append(location_name)
+        results["total_skills"] += len(skills)
+
+        for skill in skills:
+            validator = SecurityValidator(skill["path"])
+            report = validator.analyze()
+
+            results["skills"].append(
+                {
+                    "name": skill["name"],
+                    "path": skill["path"],
+                    "location": location_name,
+                    "risk_level": report["risk_level"],
+                    "risk_score": report["risk_score"],
+                    "findings_count": report["total_findings"],
+                    "recommendation": report["recommendation"],
+                }
+            )
+
+            results["summary"][report["risk_level"].lower()] += 1
+
+    return results
+
+
 def main():
     if len(sys.argv) < 2:
-        print("Usage: validate_security.py <path-to-skill-or-script>")
-        sys.exit(1)
+        print("Skill Security Validator")
+        print("=" * 50)
+        print("\nUsage:")
+        print("  validate_security.py <path>              - Scan a specific path")
+        print("  validate_security.py --list             - List all skills found")
+        print("  validate_security.py --scan-all          - Scan all skills")
+        print(
+            "  validate_security.py <skill-name>        - Find and scan skill by name"
+        )
+        print("\nExamples:")
+        print("  validate_security.py ~/skills/my-skill")
+        print("  validate_security.py notebooklm")
+        print("  validate_security.py --scan-all")
+        print("\nKnown skill locations:")
+        locations = get_skill_locations()
+        for path, name in locations:
+            print(f"  - {name}: {path}")
+        print()
+        sys.exit(0)
+
+    arg = sys.argv[1]
+
+    if arg == "--list":
+        all_skills = list_all_skills()
+        print(json.dumps(all_skills, indent=2))
+        sys.exit(0)
+
+    if arg == "--scan-all":
+        results = scan_all_skills()
+        print(json.dumps(results, indent=2))
+
+        if results["summary"]["critical"] > 0 or results["summary"]["high"] > 0:
+            sys.exit(2)
+        elif results["summary"]["medium"] > 0:
+            sys.exit(1)
+        else:
+            sys.exit(0)
 
     target = sys.argv[1]
+
+    if "/" not in target and "\\" not in target and not Path(target).exists():
+        found = find_skill_by_name(target)
+        if found:
+            print(f"Found skill '{target}' at: {found[0]}")
+            target = str(found[0])
+        else:
+            print(f"Skill '{target}' not found in any known location.")
+            print("\nSearching in:")
+            locations = get_skill_locations()
+            for path, name in locations:
+                print(f"  - {name}: {path}")
+            sys.exit(1)
+
     validator = SecurityValidator(target)
     report = validator.analyze()
 
