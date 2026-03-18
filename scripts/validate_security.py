@@ -1078,13 +1078,25 @@ def main():
 
     target = sys.argv[1]
 
-    if "/" not in target and "\\" not in target and not Path(target).exists():
-        found = find_skill_by_name(target)
+    # If path doesn't exist, try to find skill by name in all locations
+    if not Path(target).exists():
+        # Extract skill name from path (handle both paths like .opencode/skill/notebooklm and just notebooklm)
+        skill_name = target
+        # If path contains path separators, try to extract the skill name
+        if "/" in target or "\\" in target:
+            # Get just the last part of the path
+            parts = target.replace("\\", "/").split("/")
+            skill_name = parts[-1]
+
+        print(
+            f"Path '{target}' not found. Searching for skill '{skill_name}' in all locations..."
+        )
+        found = find_skill_by_name(skill_name)
         if found:
-            print(f"Found skill '{target}' at: {found[0]}")
+            print(f"Found skill '{skill_name}' at: {found[0]}")
             target = str(found[0])
         else:
-            print(f"Skill '{target}' not found in any known location.")
+            print(f"Skill '{skill_name}' not found in any known location.")
             print("\nSearching in:")
             locations = get_skill_locations()
             for path, name in locations:
