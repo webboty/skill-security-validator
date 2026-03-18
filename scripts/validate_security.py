@@ -651,6 +651,7 @@ class SecurityValidator:
             self.risk_level = "CRITICAL"
 
     def _generate_report(self) -> Dict[str, Any]:
+        smart_analysis = self._analyze_findings_context()
         return {
             "target_path": str(self.target_path),
             "risk_level": self.risk_level,
@@ -659,6 +660,7 @@ class SecurityValidator:
             "findings": self.findings,
             "recommendation": self._get_recommendation(),
             "explanation": self._get_detailed_explanation(),
+            "smart_analysis": smart_analysis,
         }
 
     def _get_detailed_explanation(self) -> Dict[str, Any]:
@@ -719,13 +721,135 @@ class SecurityValidator:
         else:
             return "CRITICAL: This skill exhibits multiple high-risk patterns. Strongly recommend NOT using until thoroughly reviewed by a security expert."
 
+    def _analyze_findings_context(self) -> Dict[str, Any]:
+        """Analyze the context of findings to provide smarter risk assessment."""
+
+        # Count by type
+        dangerous_patterns = sum(
+            1 for f in self.findings if f.get("type") == "dangerous_pattern"
+        )
+        malicious_keywords = sum(
+            1 for f in self.findings if f.get("type") == "malicious_keyword"
+        )
+        sensitive_files = sum(
+            1 for f in self.findings if f.get("type") == "sensitive_file_access"
+        )
+        network_access = sum(
+            1 for f in self.findings if f.get("type") == "network_access"
+        )
+
+        # Check if findings are in documentation files (SKILL.md, README.md, etc.)
+        doc_files = [
+            f
+            for f in self.findings
+            if "SKILL.md" in f.get("file", "") or "README.md" in f.get("file", "")
+        ]
+        code_files = [f for f in self.findings if f not in doc_files]
+
+        # Check for common false positive patterns
+        false_positive_patterns = [
+            "pip install",
+            "npm install",
+            "import sys",
+            "import os",
+            "import json",
+            "import requests",
+            "import httpx",
+            "http://",
+            "https://",
+            "documentation",
+            "example",
+            "tutorial",
+            "how to",
+            "install",
+        ]
+
+        false_positive_count = 0
+        for finding in self.findings:
+            content = finding.get("content", "").lower()
+            pattern = finding.get("pattern", "").lower()
+            for fp in false_positive_patterns:
+                if fp in content or fp in pattern:
+                    false_positive_count += 1
+                    break
+
+        # Determine if likely documentation vs actual code
+        is_documentation_heavy = len(doc_files) > len(code_files) and len(doc_files) > 3
+
+        # Calculate adjusted risk
+        adjusted_score = self.risk_score
+
+        # Reduce score significantly if findings are mostly documentation
+        if is_documentation_heavy:
+            adjusted_score = int(adjusted_score * 0.3)
+
+        # Reduce score if most findings are known false positives
+        if false_positive_count > len(self.findings) * 0.7:
+            adjusted_score = int(adjusted_score * 0.2)
+
+        # Determine adjusted risk level
+        if adjusted_score == 0:
+            adjusted_level = "SAFE"
+        elif adjusted_score < 10:
+            adjusted_level = "LOW"
+        elif adjusted_score < 30:
+            adjusted_level = "MEDIUM"
+        elif adjusted_score < 50:
+            adjusted_level = "HIGH"
+        else:
+            adjusted_level = "CRITICAL"
+
+        # Generate context-aware assessment
+        context_notes = []
+        if is_documentation_heavy:
+            context_notes.append(
+                "⚠️ Most findings are in documentation files (SKILL.md, README.md). These are likely examples/instructions, not actual malicious code."
+            )
+        if false_positive_count > len(self.findings) * 0.7:
+            context_notes.append(
+                "⚠️ Most findings are common false positives (import statements, URLs in documentation)."
+            )
+        if doc_files and code_files:
+            context_notes.append(
+                f"📄 {len(doc_files)} findings in documentation, {len(code_files)} in code files."
+            )
+
+        # Extract potential library names for web search
+        library_names = set()
+        for finding in self.findings:
+            content = finding.get("content", "")
+            # Look for pip install, npm install patterns
+            if "pip install" in content.lower() or "pip" in content.lower():
+                import re
+
+                matches = re.findall(r"pip install ([a-zA-Z0-9_-]+)", content)
+                library_names.update(matches)
+            if "import " in content:
+                import re
+
+                matches = re.findall(r"import ([a-zA-Z0-9_-]+)", content)
+                library_names.update(
+                    matches[:1]
+                )  # First import is usually the main library
+
+        return {
+            "original_risk_level": self.risk_level,
+            "original_risk_score": self.risk_score,
+            "adjusted_risk_level": adjusted_level,
+            "adjusted_risk_score": adjusted_score,
+            "context_notes": context_notes,
+            "potential_libraries": list(library_names)[:5],  # Max 5
+            "is_documentation_heavy": is_documentation_heavy,
+            "false_positive_ratio": false_positive_count / max(len(self.findings), 1),
+        }
+
     def _get_recommendation(self) -> str:
         if self.risk_level == "SAFE":
             return "This skill/script appears safe for use."
         elif self.risk_level == "LOW":
             return "Minor concerns detected. Review findings before use."
         elif self.risk_level == "MEDIUM":
-            return "Exercise caution. Review all findings carefully."
+            return "Exercise caution. Review findings carefully."
         elif self.risk_level == "HIGH":
             return "HIGH RISK - Do not use without thorough manual review."
         else:
@@ -1113,12 +1237,49 @@ def main():
             print(f"\nScanning single skill...")
             validator = SecurityValidator(str(unique_found[0]))
             report = validator.analyze()
+
+            # Print human-readable summary with smart analysis
+            print("\n" + "=" * 60)
+            print("SECURITY SCAN RESULTS")
+            print("=" * 60)
+
+            sa = report.get("smart_analysis", {})
+            print(
+                f"\n📊 Raw Risk Score: {sa.get('original_risk_score', report.get('risk_score'))}/100 ({sa.get('original_risk_level', report.get('risk_level'))})"
+            )
+
+            if sa.get("adjusted_risk_score") is not None:
+                print(
+                    f"📊 Adjusted Risk: {sa.get('adjusted_risk_score')}/100 ({sa.get('adjusted_risk_level')})"
+                )
+
+            # Print context notes
+            for note in sa.get("context_notes", []):
+                print(f"\n{note}")
+
+            # Print recommendation
+            print(f"\n💡 Recommendation: {report.get('recommendation')}")
+
+            # Check for potential libraries to verify
+            libraries = sa.get("potential_libraries", [])
+            if libraries:
+                print(f"\n🔍 Potential libraries detected: {', '.join(libraries)}")
+                print(
+                    "   → Would you like me to web search to verify these are legitimate?"
+                )
+
+            print("\n" + "=" * 60)
+
         else:
             print(f"\nScanning ALL {len(unique_found)} instances...")
             all_reports = []
+            all_smart_analyses = []
+            all_potential_libraries = set()
+
             for f in unique_found:
                 validator = SecurityValidator(str(f))
                 report = validator.analyze()
+
                 all_reports.append(
                     {
                         "path": str(f),
@@ -1129,7 +1290,12 @@ def main():
                     }
                 )
 
-            # Print combined report
+                # Collect smart analysis
+                sa = report.get("smart_analysis", {})
+                all_smart_analyses.append(sa)
+                all_potential_libraries.update(sa.get("potential_libraries", []))
+
+            # Print combined report with smart analysis
             combined = {
                 "skill_name": skill_name,
                 "total_instances": len(unique_found),
@@ -1152,6 +1318,42 @@ def main():
             combined["overall_risk_score"] = highest_risk["risk_score"]
             combined["recommendation"] = highest_risk["recommendation"]
 
+            # Add smart analysis to combined
+            combined["smart_analysis"] = {
+                "all_context_notes": [
+                    sa.get("context_notes", []) for sa in all_smart_analyses
+                ],
+                "potential_libraries": list(all_potential_libraries)[:5],
+            }
+
+            # Print human-readable summary
+            print("\n" + "=" * 60)
+            print("SECURITY SCAN RESULTS")
+            print("=" * 60)
+
+            print(
+                f"\n📊 Raw Risk Score: {combined['overall_risk_score']}/100 ({combined['overall_risk_level']})"
+            )
+
+            # Print context notes from first report
+            for sa in all_smart_analyses:
+                for note in sa.get("context_notes", []):
+                    print(f"\n{note}")
+
+            print(f"\n💡 Recommendation: {combined['recommendation']}")
+
+            # Check for potential libraries to verify
+            if all_potential_libraries:
+                print(
+                    f"\n🔍 Potential libraries detected: {', '.join(list(all_potential_libraries)[:5])}"
+                )
+                print(
+                    "   → Would you like me to web search to verify these are legitimate?"
+                )
+
+            print("\n" + "=" * 60)
+
+            # Print full JSON
             print(json.dumps(combined, indent=2))
 
             if combined["overall_risk_level"] in ["HIGH", "CRITICAL"]:
