@@ -13,6 +13,11 @@ Analyzes skills and scripts for security risks before installation or use.
 python3 .opencode/skill/skill-security-validator/scripts/validate_security.py <path-to-skill-or-script>
 ```
 
+Or by skill name:
+```bash
+python3 .opencode/skill/skill-security-validator/scripts/validate_security.py notebooklm
+```
+
 ## What It Checks
 
 ### Malicious Keywords (CRITICAL)
@@ -66,3 +71,71 @@ python3 .opencode/skill/skill-security-validator/scripts/validate_security.py <p
 - 0: SAFE or LOW risk
 - 1: MEDIUM risk
 - 2: HIGH or CRITICAL risk
+
+---
+
+# LLM Instructions: Post-Scan Assessment
+
+After running the validator, analyze the results and provide recommendations to the user:
+
+## 1. Interpret Smart Analysis
+The validator outputs a "smart_analysis" section with:
+- `adjusted_risk_level` - Lower risk if findings are mostly documentation
+- `context_notes` - Explanations about false positives
+- `potential_libraries` - Library names found that should be verified
+
+## 2. Provide Context to User
+Always explain findings in plain language:
+- What the risk means
+- Why it might be a false positive (e.g., "this is in documentation explaining pip install")
+- What action to take
+
+## 3. Offer Follow-up Actions
+After showing results, ALWAYS ask the user if they want:
+
+**Option 1: Verify Libraries Online**
+> "Would you like me to web search to verify if [library-name] is a legitimate library?"
+
+If yes, search for the library to check:
+- Is it a known legitimate package?
+- Any security advisories?
+- Is the source trusted (GitHub, PyPI, npm)?
+
+**Option 2: Scan Downloaded Package**
+> "Would you like me to scan the actual Python/npm package this skill installs?"
+
+If yes, use webfetch or download the package and run validate_security.py on it.
+
+**Option 3: Review Source Code**
+> "Would you like me to read the main source files to check for suspicious code?"
+
+If yes, glob for `.py`, `.js` files and read the main entry points.
+
+## 4. Security Recommendations
+Based on findings, provide actionable advice:
+- If CRITICAL: Strongly recommend NOT using until expert review
+- If HIGH: Suggest manual code review
+- If MEDIUM: Note what patterns were found and why they're likely safe/risky
+- If SAFE: Confirm it's likely safe to use
+
+## Example Response Template
+
+```
+📊 SECURITY SCAN COMPLETE
+
+[Risk Level]: [Score]/100
+
+Findings:
+- [List key findings in plain language]
+
+Context: [Explain if findings are likely false positives]
+
+⚠️ This skill appears to be [SAFE/RISKY] based on the analysis.
+
+Follow-up options:
+1. Web search to verify [library names]
+2. Scan the installed package
+3. Review source code manually
+
+What would you like me to do next?
+```
