@@ -525,10 +525,18 @@ def get_home_dir():
     return Path.home()
 
 
+def get_cwd():
+    """Get current working directory."""
+    return Path.cwd()
+
+
 def get_skill_locations():
-    """Get all known skill locations for different AI agents and OS."""
+    """Get all known skill locations for different AI agents and OS (global and project)."""
     home = get_home_dir()
+    cwd = get_cwd()
     is_windows = sys.platform == "win32"
+
+    locations = []
 
     if is_windows:
         userprofile = Path(os.environ.get("USERPROFILE", str(home)))
@@ -536,21 +544,79 @@ def get_skill_locations():
             os.environ.get("APPDATA", str(userprofile / "AppData" / "Roaming"))
         )
 
-        locations = [
-            (userprofile / ".claude" / "skills", "Claude Code (global)"),
-            (userprofile / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
-            (appdata / "opencode" / "skills", "OpenCode (config)"),
-            (userprofile / ".cursor" / "rules", "Cursor (rules)"),
-            (userprofile / "kilocode" / "skills", "KiloCode"),
-        ]
+        # GLOBAL locations (user's home directory)
+        locations.extend(
+            [
+                (userprofile / ".claude" / "skills", "Claude Code (global)"),
+                (userprofile / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
+                (appdata / "opencode" / "skills", "OpenCode config (global)"),
+                (
+                    appdata
+                    / "Code"
+                    / "User"
+                    / "globalStorage"
+                    / "codeium"
+                    / "workspace",
+                    "Codeium (global)",
+                ),
+                (userprofile / ".cursor" / "rules", "Cursor (global)"),
+                (
+                    userprofile / "AppData" / "Local" / "Programs" / "Windsurf",
+                    "Windsurf",
+                ),
+                (userprofile / ".codex" / "skills", "Codex (global)"),
+                (userprofile / ".goose" / "skills", "Goose (global)"),
+                (userprofile / ".letta" / "skills", "Letta (global)"),
+                (userprofile / ".gemini" / "cli" / "skills", "Gemini CLI (global)"),
+                (userprofile / ".kilocode" / "skills", "KiloCode (global)"),
+            ]
+        )
+
+        # PROJECT locations (current working directory)
+        locations.extend(
+            [
+                (cwd / ".claude" / "skills", "Claude Code (project)"),
+                (cwd / ".agents" / "skills", "OpenCode/OpenClaw (project)"),
+                (cwd / ".opencode" / "skills", "OpenCode (project)"),
+                (cwd / ".cursor" / "rules", "Cursor (project)"),
+                (cwd / ".windsurf" / "skills.json", "Windsurf (project)"),
+                (cwd / ".github" / "skills", "GitHub (project)"),
+                (cwd / ".codex" / "skills", "Codex (project)"),
+                (cwd / "AGENTS.md", "Codex/通用 (project)"),
+                (cwd / "CLAUDE.md", "Claude (project)"),
+            ]
+        )
     else:
-        locations = [
-            (home / ".claude" / "skills", "Claude Code (global)"),
-            (home / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
-            (home / ".config" / "opencode" / "skills", "OpenCode (config)"),
-            (home / ".cursor" / "rules", "Cursor (rules)"),
-            (home / ".kilocode" / "skills", "KiloCode"),
-        ]
+        # macOS/Linux GLOBAL locations
+        locations.extend(
+            [
+                (home / ".claude" / "skills", "Claude Code (global)"),
+                (home / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
+                (home / ".config" / "opencode" / "skills", "OpenCode config (global)"),
+                (home / ".cursor" / "rules", "Cursor (global)"),
+                (home / ".windsurf" / "skills.json", "Windsurf (global)"),
+                (home / ".codex" / "skills", "Codex (global)"),
+                (home / ".goose" / "skills", "Goose (global)"),
+                (home / ".letta" / "skills", "Letta (global)"),
+                (home / ".gemini" / "cli" / "skills", "Gemini CLI (global)"),
+                (home / ".kilocode" / "skills", "KiloCode (global)"),
+            ]
+        )
+
+        # macOS/Linux PROJECT locations
+        locations.extend(
+            [
+                (cwd / ".claude" / "skills", "Claude Code (project)"),
+                (cwd / ".agents" / "skills", "OpenCode/OpenClaw (project)"),
+                (cwd / ".opencode" / "skills", "OpenCode (project)"),
+                (cwd / ".cursor" / "rules", "Cursor (project)"),
+                (cwd / ".windsurf" / "skills.json", "Windsurf (project)"),
+                (cwd / ".github" / "skills", "GitHub (project)"),
+                (cwd / ".codex" / "skills", "Codex (project)"),
+                (cwd / "AGENTS.md", "Codex/通用 (project)"),
+                (cwd / "CLAUDE.md", "Claude (project)"),
+            ]
+        )
 
     valid_locations = [(p, name) for p, name in locations if p.exists()]
     return valid_locations
@@ -582,6 +648,18 @@ def list_all_skills() -> Dict[str, List[Dict[str, str]]]:
         if not base_path.exists():
             continue
 
+        # Handle single file locations (like AGENTS.md, CLAUDE.md)
+        if base_path.is_file():
+            all_skills.setdefault(location_name, []).append(
+                {
+                    "name": base_path.stem,
+                    "path": str(base_path),
+                    "location": location_name,
+                }
+            )
+            continue
+
+        # Handle directory locations
         skills = []
         for item in base_path.iterdir():
             if item.is_dir():
