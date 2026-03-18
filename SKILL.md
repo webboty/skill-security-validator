@@ -7,6 +7,55 @@ description: Validates third-party skills and scripts for security vulnerabiliti
 
 Analyzes skills and scripts for security risks before installation or use.
 
+## ⚠️ IMPORTANT: HOW TO PRESENT RESULTS TO USER
+
+After running the validation script, you MUST present the results to the user using the format below. DO NOT just show raw tool output - summarize it properly!
+
+The script output already contains everything you need in a structured format. Present it in this EXACT format:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║                    SECURITY SCAN COMPLETE                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+Skill: [name from script output]
+Location: [path from script output]
+
+┌───────────────────────────────────────────────────────────┐
+│  SCRIPT SCAN RESULTS (automated)                         │
+├───────────────────────────────────────────────────────────┤
+│  Risk Level:    [LEVEL from script]                      │
+│  Risk Score:    [SCORE]/100                             │
+│  Code Issues:   [X] findings                            │
+│  Instructions:  [X] files checked, [Y] issues found    │
+└───────────────────────────────────────────────────────────┘
+
+✅ Script Checks Performed:
+   • Code patterns (subprocess, eval, exec, etc.)
+   • Network calls (HTTP requests, sockets)
+   • Sensitive file access (.env, credentials)
+   • Skill instructions (SKILL.md, references, etc.)
+
+📋 Files checked for instructions: [X]
+
+[If instruction issues > 0]:
+⚠️ POTENTIAL ISSUES IN INSTRUCTIONS:
+   - [list issues from script]
+
+🤖 LLM INVESTIGATION (YOU MUST DO THIS):
+[Explain what the findings mean]
+[Are they false positives? Why?]
+[What does the skill actually do?]
+
+✅ VERDICT: [SAFE / CAUTION / UNSAFE]
+
+[If potential_followups exist]:
+🔍 Want more verification?
+1. [option]
+
+Just say the number (or "done")!
+```
+
 ## Usage
 
 ```bash
