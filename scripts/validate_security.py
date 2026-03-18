@@ -687,8 +687,10 @@ class SecurityValidator:
             ),
         ]
 
-        # Check all relevant skill files for bad instructions
+        # Check ALL files in skill directory for bad instructions
         target_path = Path(self.target_path)
+        files_checked = []
+
         if target_path.is_dir():
             # Files to check (text-based that could contain instructions)
             check_extensions = {
@@ -700,26 +702,33 @@ class SecurityValidator:
                 ".py",
                 ".js",
                 ".ts",
+                ".sh",
+                ".bash",
             }
-            # Files to SKIP (contain real credentials)
-            skip_names = {".env", "credentials", "secrets", "config.json", ".env.local"}
+            # Files to SKIP (contain real credentials - DO NOT read these!)
+            skip_names = {".env", "credentials", "secrets", ".env.local", ".env.prod"}
 
             for file_path in target_path.rglob("*"):
                 if not file_path.is_file():
                     continue
-                # Skip files that might contain real credentials
+                # Skip files that contain real credentials
                 if any(skip in file_path.name.lower() for skip in skip_names):
+                    continue
+                # Skip compiled/binary files
+                if file_path.suffix.lower() in {
+                    ".pyc",
+                    ".pyo",
+                    ".so",
+                    ".dll",
+                    ".exe",
+                    ".bin",
+                }:
                     continue
                 # Only check text-based files
                 if file_path.suffix.lower() not in check_extensions:
                     continue
-                # Skip node_modules, .git, etc.
-                if any(part.startswith(".") for part in file_path.parts):
-                    if (
-                        ".claude" not in file_path.parts
-                        and ".agents" not in file_path.parts
-                    ):
-                        continue
+
+                files_checked.append(str(file_path.relative_to(target_path)))
 
                 try:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -742,21 +751,22 @@ class SecurityValidator:
                 except Exception:
                     pass
 
-        return skill_md_issues
+        return skill_md_issues, files_checked
 
     def _generate_report(self) -> Dict[str, Any]:
         smart_analysis = self._analyze_findings_context()
 
         # Analyze ALL skill files for prompt injection/bad instructions
-        skill_md_issues = self._analyze_skill_md()
+        skill_md_issues, files_checked = self._analyze_skill_md()
 
         # Determine what checks were performed
         checks_performed = {
             "code_patterns": True,  # Always done via scanning
             "network_calls": True,  # Always done via scanning
             "sensitive_files": True,  # Always done via scanning
-            "skill_instructions": True,  # Now done for all skill files
-            "skill_md_analysis": len(skill_md_issues),  # Count of issues found
+            "skill_instructions": True,  # Done for ALL skill files
+            "skill_instruction_files_checked": files_checked,
+            "skill_instruction_issues_found": len(skill_md_issues),
         }
 
         # Determine what CAN be done as follow-up (not yet done or deeper)
@@ -795,6 +805,7 @@ class SecurityValidator:
             "findings": self.findings,
             "checks_performed": checks_performed,
             "skill_instructions_analysis": {
+                "files_checked": files_checked,
                 "issues_found": len(skill_md_issues),
                 "issues": skill_md_issues[:10],  # Limit to first 10
             },
