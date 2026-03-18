@@ -117,6 +117,39 @@ python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py 
 
 ---
 
+## 🌍 Supported Locations
+
+The validator automatically scans skills from **all major AI agents** across **all operating systems**:
+
+### Global Locations (User's Home Directory)
+| Agent | Path (macOS/Linux) | Path (Windows) |
+|-------|-------------------|----------------|
+| Claude Code | `~/.claude/skills/` | `%USERPROFILE%\.claude\skills\` |
+| OpenCode | `~/.agents/skills/` | `%USERPROFILE%\.agents\skills\` |
+| OpenCode Config | `~/.config/opencode/skills/` | `%APPDATA%\opencode\skills\` |
+| Cursor | `~/.cursor/rules/` | `%USERPROFILE%\.cursor\rules\` |
+| Windsurf | `~/.windsurf/skills.json` | `%USERPROFILE%\.windsurf\skills.json\` |
+| Codex | `~/.codex/skills/` | `%USERPROFILE%\.codex\skills\` |
+| Goose | `~/.goose/skills/` | `%USERPROFILE%\.goose\skills\` |
+| Letta | `~/.letta/skills/` | `%USERPROFILE%\.letta\skills\` |
+| Gemini CLI | `~/.gemini/cli/skills/` | `%USERPROFILE%\.gemini\cli\skills\` |
+| KiloCode | `~/.kilocode/skills/` | `%USERPROFILE%\.kilocode\skills\` |
+
+### Project Locations (Current Directory)
+| Agent | Path |
+|-------|------|
+| Claude Code | `.claude/skills/` |
+| OpenCode | `.agents/skills/` |
+| OpenCode | `.opencode/skills/` |
+| Cursor | `.cursor/rules/` |
+| Windsurf | `.windsurf/skills.json` |
+| GitHub | `.github/skills/` |
+| Codex | `.codex/skills/` |
+| Codex/通用 | `AGENTS.md` |
+| Claude | `CLAUDE.md` |
+
+---
+
 ## 📊 Risk Levels
 
 | Level | Score | Meaning |
@@ -126,6 +159,32 @@ python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py 
 | 🟠 MEDIUM | 10-29 | Exercise caution |
 | 🔴 HIGH | 30-49 | Manual review required |
 | ⛔ CRITICAL | 50+ | **DO NOT USE** |
+
+---
+
+## 🤖 Installing for Different AI Agents
+
+### For Claude Code
+```bash
+# Clone to Claude Code skills folder
+git clone https://github.com/webboty/skill-security-validator.git ~/.claude/skills/skill-security-validator
+```
+Then use it with `/skill-security-validator` in Claude Code.
+
+### For OpenCode
+```bash
+git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
+```
+
+### For Cursor
+```bash
+git clone https://github.com/webboty/skill-security-validator.git ~/.cursor/rules/skill-security-validator
+```
+
+### For All Agents (using openskills)
+```bash
+npx openskills install webboty/skill-security-validator
+```
 
 ---
 
