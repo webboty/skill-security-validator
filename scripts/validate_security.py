@@ -816,11 +816,13 @@ class SecurityValidator:
             "risk_score": displayed_score,
             "total_findings": len(self.findings),
             "findings_summary": f"{len(self.findings)} code issues found",
+            "findings": self.findings,  # Include actual findings for display
             "checks_performed": checks_performed,
             "skill_instructions_analysis": {
                 "files_checked_count": len(files_checked),
+                "files_checked": files_checked,  # Full list of files checked
                 "issues_found": len(skill_md_issues),
-                "issues": skill_md_issues[:5],  # Limit to first 5
+                "issues": skill_md_issues,  # Show ALL issues, not just 5
             },
             "recommendation": self._get_recommendation(),
             "smart_analysis": smart_analysis,
@@ -971,7 +973,7 @@ class SecurityValidator:
             )
         if false_positive_count > len(self.findings) * 0.7:
             context_notes.append(
-                "⚠️ Most findings are common false positives (import statements, URLs in documentation)."
+                "⚠️ Most findings are common patterns in legitimate code (import statements, URLs in documentation)."
             )
         if doc_files and code_files:
             context_notes.append(
@@ -1544,20 +1546,31 @@ def main():
         print(f"   • Sensitive file access (.env, credentials)")
         print(f"   • Skill instructions (SKILL.md, references, etc.)")
 
-        # Files checked - show count only
+        # Files checked - show DETAILED list
         files_checked_count = skill_analysis.get("files_checked_count", 0)
+        files_checked_list = skill_analysis.get("files_checked", [])
         if files_checked_count > 0:
-            print(f"\n📂 Instruction files checked: {files_checked_count}")
+            print(f"\n📂 Instruction/Code files checked ({files_checked_count} total):")
+            # Show first 15 files as examples
+            for f in files_checked_list[:15]:
+                print(f"   ✓ {f}")
+            if files_checked_count > 15:
+                print(f"   ... and {files_checked_count - 15} more files")
 
         # Issues found - IMPORTANT: test directories are now skipped
         issues_found = skill_analysis.get("issues_found", 0)
         if issues_found > 0:
-            print(f"\n⚠️  POTENTIAL ISSUES IN INSTRUCTIONS:")
-            for issue in skill_analysis.get("issues", [])[:3]:
-                print(f"   - {issue['file']}:{issue['line']} - {issue['pattern']}")
-            print(f"   → These may be false positives - check context!")
+            print(f"\n⚠️  POTENTIAL ISSUES IN INSTRUCTIONS ({issues_found} found):")
+            for issue in skill_analysis.get("issues", []):
+                print(f"   📄 {issue['file']}:{issue['line']}")
+                print(f"      Pattern: {issue['pattern']}")
+                print(f"      Context: {issue['content'][:100]}...")
+                print()
+            print(
+                f"   → LLM must investigate to determine if real issue or expected pattern!"
+            )
         else:
-            print(f"\n✅ No malicious instructions found")
+            print(f"\n✅ No malicious instructions found in any file")
 
         # Context notes
         context_shown = False
@@ -1569,6 +1582,17 @@ def main():
                 print(f"   {note}")
 
         print(f"\n💡 Recommendation: {highest_risk['recommendation']}")
+
+        # Show code issues found in the highest risk instance
+        first_report = all_skill_analysis[0]
+        findings = first_report.get("findings", [])
+        if findings:
+            print(f"\n🔍 Sample Code Issues Found ({len(findings)} total):")
+            for f in findings[:10]:
+                print(f"   • {f.get('type')}: {f.get('pattern')}")
+                print(f"     File: {Path(f.get('file', '')).name}:{f.get('line')}")
+            if len(findings) > 10:
+                print(f"   ... and {len(findings) - 10} more issues")
 
         # Show minimal JSON - summary only
         combined = {
@@ -1592,6 +1616,14 @@ def main():
         else:
             sys.exit(0)
         return
+
+    # Path exists - scan it directly
+    print(f"Scanning: {target}")
+    validator = SecurityValidator(target)
+    report = validator.analyze()
+
+    # Print comprehensive human-readable summary
+    _print_single_report(report, Path(target).name)
 
 
 def _print_single_report(report, skill_name=None):
@@ -1634,31 +1666,38 @@ def _print_single_report(report, skill_name=None):
     print(f"   • Sensitive file access (.env, credentials)")
     print(f"   • Skill instructions (SKILL.md, references, etc.)")
 
-    # Files checked - show count only
+    # Files checked - show DETAILED list
     files_checked_count = skill_analysis.get("files_checked_count", 0)
+    files_checked_list = skill_analysis.get("files_checked", [])
     if files_checked_count > 0:
-        print(f"\n📂 Instruction files checked: {files_checked_count}")
+        print(f"\n📂 Instruction/Code files checked ({files_checked_count} total):")
+        for f in files_checked_list[:15]:
+            print(f"   ✓ {f}")
+        if files_checked_count > 15:
+            print(f"   ... and {files_checked_count - 15} more files")
 
     # Issues found in instructions - test dirs now skipped
     issues_found = skill_analysis.get("issues_found", 0)
     if issues_found > 0:
-        print(f"\n⚠️  POTENTIAL ISSUES IN INSTRUCTIONS:")
-        for issue in skill_analysis.get("issues", [])[:3]:
-            print(f"   - {issue['file']}:{issue['line']} - {issue['pattern']}")
-        print(f"   → These may be false positives - check context!")
+        print(f"\n⚠️  POTENTIAL ISSUES IN INSTRUCTIONS ({issues_found} found):")
+        for issue in skill_analysis.get("issues", []):
+            print(f"   📄 {issue['file']}:{issue['line']}")
+            print(f"      Pattern: {issue['pattern']}")
+            print(f"      Context: {issue['content'][:100]}...")
+            print()
+        print(f"   → These may be false positives - LLM must check context!")
     else:
-        print(f"\n✅ No malicious instructions found")
+        print(f"\n✅ No malicious instructions found in any file")
 
     # Code issues found (script flagged these)
     findings = report.get("findings", [])
     if findings:
-        print(f"\n🔍 Code Issues Found (script flagged these):")
-        for f in findings[:5]:
-            print(
-                f"   - {f.get('type')}: {f.get('pattern')} in {Path(f.get('file', '')).name}:{f.get('line')}"
-            )
-        if len(findings) > 5:
-            print(f"   ... and {len(findings) - 5} more issues")
+        print(f"\n🔍 Sample Code Issues Found ({len(findings)} total):")
+        for f in findings[:15]:
+            print(f"   • {f.get('type')}: {f.get('pattern')}")
+            print(f"     File: {Path(f.get('file', '')).name}:{f.get('line')}")
+        if len(findings) > 15:
+            print(f"   ... and {len(findings) - 15} more issues")
 
     # LLM Assessment
     print(f"\n🤖 LLM ASSESSMENT (human investigation):")
