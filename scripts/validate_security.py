@@ -1092,10 +1092,8 @@ def main():
             f"Path '{target}' not found. Searching for skill '{skill_name}' in all locations..."
         )
         found = find_skill_by_name(skill_name)
-        if found:
-            print(f"Found skill '{skill_name}' at: {found[0]}")
-            target = str(found[0])
-        else:
+
+        if not found:
             print(f"Skill '{skill_name}' not found in any known location.")
             print("\nSearching in:")
             locations = get_skill_locations()
@@ -1103,17 +1101,81 @@ def main():
                 print(f"  - {name}: {path}")
             sys.exit(1)
 
+        # Remove duplicates (same skill might be in multiple lists)
+        unique_found = list(set(found))
+
+        # Found multiple instances - scan ALL of them
+        print(f"Found {len(unique_found)} unique instance(s) of skill '{skill_name}':")
+        for i, f in enumerate(unique_found, 1):
+            print(f"  {i}. {f}")
+
+        if len(unique_found) == 1:
+            print(f"\nScanning single skill...")
+            validator = SecurityValidator(str(unique_found[0]))
+            report = validator.analyze()
+        else:
+            print(f"\nScanning ALL {len(unique_found)} instances...")
+            all_reports = []
+            for f in unique_found:
+                validator = SecurityValidator(str(f))
+                report = validator.analyze()
+                all_reports.append(
+                    {
+                        "path": str(f),
+                        "risk_level": report["risk_level"],
+                        "risk_score": report["risk_score"],
+                        "findings_count": report["total_findings"],
+                        "recommendation": report["recommendation"],
+                    }
+                )
+
+            # Print combined report
+            combined = {
+                "skill_name": skill_name,
+                "total_instances": len(unique_found),
+                "instances_scanned": all_reports,
+                "summary": {
+                    "safe": sum(1 for r in all_reports if r["risk_level"] == "SAFE"),
+                    "low": sum(1 for r in all_reports if r["risk_level"] == "LOW"),
+                    "medium": sum(
+                        1 for r in all_reports if r["risk_level"] == "MEDIUM"
+                    ),
+                    "high": sum(1 for r in all_reports if r["risk_level"] == "HIGH"),
+                    "critical": sum(
+                        1 for r in all_reports if r["risk_level"] == "CRITICAL"
+                    ),
+                },
+            }
+
+            highest_risk = max(all_reports, key=lambda x: x["risk_score"])
+            combined["overall_risk_level"] = highest_risk["risk_level"]
+            combined["overall_risk_score"] = highest_risk["risk_score"]
+            combined["recommendation"] = highest_risk["recommendation"]
+
+            print(json.dumps(combined, indent=2))
+
+            if combined["overall_risk_level"] in ["HIGH", "CRITICAL"]:
+                sys.exit(2)
+            elif combined["overall_risk_level"] == "MEDIUM":
+                sys.exit(1)
+            else:
+                sys.exit(0)
+            return
+
+        print(json.dumps(report, indent=2))
+
+        if report.get("risk_level") in ["HIGH", "CRITICAL"]:
+            sys.exit(2)
+        elif report.get("risk_level") == "MEDIUM":
+            sys.exit(1)
+        else:
+            sys.exit(0)
+        return
+
     validator = SecurityValidator(target)
     report = validator.analyze()
 
     print(json.dumps(report, indent=2))
-
-    if report.get("risk_level") in ["HIGH", "CRITICAL"]:
-        sys.exit(2)
-    elif report.get("risk_level") == "MEDIUM":
-        sys.exit(1)
-    else:
-        sys.exit(0)
 
 
 if __name__ == "__main__":
