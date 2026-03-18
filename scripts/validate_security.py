@@ -707,12 +707,25 @@ class SecurityValidator:
             }
             # Files to SKIP (contain real credentials - DO NOT read these!)
             skip_names = {".env", "credentials", "secrets", ".env.local", ".env.prod"}
+            # Directories to SKIP (test files contain expected words like "malicious" in test names)
+            skip_dirs = {
+                "tests",
+                "test",
+                "__tests__",
+                "cassettes",
+                "e2e",
+                "fixtures",
+                "mocks",
+            }
 
             for file_path in target_path.rglob("*"):
                 if not file_path.is_file():
                     continue
                 # Skip files that contain real credentials
                 if any(skip in file_path.name.lower() for skip in skip_names):
+                    continue
+                # Skip test directories
+                if any(skip_dir in file_path.parts for skip_dir in skip_dirs):
                     continue
                 # Skip compiled/binary files
                 if file_path.suffix.lower() in {
@@ -802,15 +815,14 @@ class SecurityValidator:
             "risk_level": self.risk_level,
             "risk_score": displayed_score,
             "total_findings": len(self.findings),
-            "findings": self.findings,
+            "findings_summary": f"{len(self.findings)} code issues found",
             "checks_performed": checks_performed,
             "skill_instructions_analysis": {
-                "files_checked": files_checked,
+                "files_checked_count": len(files_checked),
                 "issues_found": len(skill_md_issues),
-                "issues": skill_md_issues[:10],  # Limit to first 10
+                "issues": skill_md_issues[:5],  # Limit to first 5
             },
             "recommendation": self._get_recommendation(),
-            "explanation": self._get_detailed_explanation(),
             "smart_analysis": smart_analysis,
             "potential_followups": potential_followups,
         }
@@ -1530,44 +1542,47 @@ def main():
         print(f"   • Code patterns (subprocess, eval, exec, etc.)")
         print(f"   • Network calls (HTTP requests, sockets)")
         print(f"   • Sensitive file access (.env, credentials)")
-        print(f"   • ALL skill files for malicious instructions")
+        print(f"   • Skill instructions (SKILL.md, references, etc.)")
 
-        # Files checked
-        files_checked = skill_analysis.get("files_checked", [])
-        if files_checked:
-            print(f"\n📂 Files checked for bad instructions:")
-            for f in files_checked[:10]:
-                print(f"   - {f}")
-            if len(files_checked) > 10:
-                print(f"   ... and {len(files_checked) - 10} more")
+        # Files checked - show count only
+        files_checked_count = skill_analysis.get("files_checked_count", 0)
+        if files_checked_count > 0:
+            print(f"\n📂 Instruction files checked: {files_checked_count}")
 
-        # Issues found
+        # Issues found - IMPORTANT: test directories are now skipped
         issues_found = skill_analysis.get("issues_found", 0)
         if issues_found > 0:
-            print(f"\n⚠️  BAD INSTRUCTIONS FOUND:")
+            print(f"\n⚠️  POTENTIAL ISSUES IN INSTRUCTIONS:")
             for issue in skill_analysis.get("issues", [])[:3]:
                 print(f"   - {issue['file']}:{issue['line']} - {issue['pattern']}")
+            print(f"   → These may be false positives - check context!")
+        else:
+            print(f"\n✅ No malicious instructions found")
 
         # Context notes
+        context_shown = False
         for sa in [s.get("smart_analysis", {}) for s in all_skill_analysis]:
             for note in sa.get("context_notes", []):
-                print(f"\n🤖 LLM Assessment:")
+                if not context_shown:
+                    print(f"\n🤖 LLM Assessment:")
+                    context_shown = True
                 print(f"   {note}")
 
         print(f"\n💡 Recommendation: {highest_risk['recommendation']}")
 
-        # Show JSON for reference
+        # Show minimal JSON - summary only
         combined = {
             "skill_name": skill_name,
-            "total_instances": len(unique_found),
-            "instances_scanned": all_reports,
+            "locations_scanned": len(unique_found),
             "overall_risk_level": highest_risk["risk_level"],
             "overall_risk_score": highest_risk["risk_score"],
-            "checks_performed": checks,
-            "skill_instructions_analysis": skill_analysis,
+            "code_issues": highest_risk["findings_count"],
+            "instruction_files_checked": files_checked_count,
+            "instruction_issues": issues_found,
         }
 
-        print("\n" + "-" * 65)
+        print("\n" + "-" * 40)
+        print("📋 Summary (JSON):")
         print(json.dumps(combined, indent=2))
 
         if highest_risk["risk_level"] in ["HIGH", "CRITICAL"]:
@@ -1608,7 +1623,7 @@ def _print_single_report(report, skill_name=None):
         f"│  Code Issues:   {report.get('total_findings', 0):<4} findings                           │"
     )
     print(
-        f"│  Instructions:  {len(skill_analysis.get('files_checked', []))} files checked, {skill_analysis.get('issues_found', 0)} issues       │"
+        f"│  Instructions:  {skill_analysis.get('files_checked_count', 0)} files checked, {skill_analysis.get('issues_found', 0)} issues       │"
     )
     print(f"└─────────────────────────────────────────────────────────┘")
 
@@ -1617,25 +1632,22 @@ def _print_single_report(report, skill_name=None):
     print(f"   • Code patterns (subprocess, eval, exec, etc.)")
     print(f"   • Network calls (HTTP requests, sockets)")
     print(f"   • Sensitive file access (.env, credentials)")
-    print(f"   • ALL skill files for malicious instructions")
+    print(f"   • Skill instructions (SKILL.md, references, etc.)")
 
-    # Files checked for instructions
-    files_checked = skill_analysis.get("files_checked", [])
-    if files_checked:
-        print(f"\n📂 Files checked for bad instructions:")
-        for f in files_checked[:10]:
-            print(f"   - {f}")
-        if len(files_checked) > 10:
-            print(f"   ... and {len(files_checked) - 10} more")
+    # Files checked - show count only
+    files_checked_count = skill_analysis.get("files_checked_count", 0)
+    if files_checked_count > 0:
+        print(f"\n📂 Instruction files checked: {files_checked_count}")
 
-    # Issues found in instructions
+    # Issues found in instructions - test dirs now skipped
     issues_found = skill_analysis.get("issues_found", 0)
     if issues_found > 0:
-        print(f"\n⚠️  BAD INSTRUCTIONS FOUND:")
+        print(f"\n⚠️  POTENTIAL ISSUES IN INSTRUCTIONS:")
         for issue in skill_analysis.get("issues", [])[:3]:
             print(f"   - {issue['file']}:{issue['line']} - {issue['pattern']}")
+        print(f"   → These may be false positives - check context!")
     else:
-        print(f"\n✅ No malicious instructions found in skill files")
+        print(f"\n✅ No malicious instructions found")
 
     # Code issues found (script flagged these)
     findings = report.get("findings", [])
@@ -1654,9 +1666,26 @@ def _print_single_report(report, skill_name=None):
         for note in sa.get("context_notes", []):
             print(f"   {note}")
     else:
-        print(f"   No additional context notes")
+        print(f"   No additional context notes - see below for explanation")
 
     print(f"\n💡 Recommendation: {report.get('recommendation', 'No recommendation')}")
+
+    # Show minimal JSON
+    print("\n" + "-" * 40)
+    print("📋 Summary (JSON):")
+    print(
+        json.dumps(
+            {
+                "skill_name": skill_name,
+                "risk_level": report.get("risk_level"),
+                "risk_score": report.get("risk_score"),
+                "code_issues": report.get("total_findings"),
+                "instruction_files_checked": files_checked_count,
+                "instruction_issues": issues_found,
+            },
+            indent=2,
+        )
+    )
 
     # Followups
     followups = report.get("potential_followups", [])
