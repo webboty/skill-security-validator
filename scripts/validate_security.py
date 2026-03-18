@@ -365,6 +365,143 @@ class SecurityValidator:
         self._calculate_risk()
         return self._generate_report()
 
+    def _get_pattern_explanation(
+        self, pattern: str, finding_type: str
+    ) -> Dict[str, str]:
+        """Get specific explanation for a pattern."""
+        explanations = {
+            "Shell execution via os.system": {
+                "explanation": "Executes shell commands. Could run malicious commands if input is not sanitized.",
+                "recommendation": "Verify the command is hardcoded and doesn't use user input. Check for command injection risks.",
+            },
+            "Shell execution via subprocess": {
+                "explanation": "Spawns subprocesses. Could execute malicious commands.",
+                "recommendation": "Ensure commands are controlled and sanitized. Avoid passing raw user input.",
+            },
+            "Direct code execution": {
+                "explanation": "Executes dynamic code strings. Extremely dangerous if input is not strictly controlled.",
+                "recommendation": "Never use exec() with untrusted input. This is a major security risk.",
+            },
+            "Code evaluation": {
+                "explanation": "Evaluates code strings. Can execute arbitrary code.",
+                "recommendation": "Avoid eval() entirely. Use safer alternatives like JSON parsing.",
+            },
+            ".env file - contains secrets/credentials": {
+                "explanation": "Accesses environment file that typically contains API keys, passwords, and secrets.",
+                "recommendation": "Ensure the skill doesn't exfiltrate these values. Check network calls for data leakage.",
+            },
+            "Environment variables access": {
+                "explanation": "Reads environment variables which may contain sensitive information.",
+                "recommendation": "Check if sensitive env vars are being logged or transmitted.",
+            },
+            "HTTP module import": {
+                "explanation": "Makes HTTP requests. Could exfiltrate data to external servers.",
+                "recommendation": "Verify destination URLs are legitimate. Check for data exfiltration.",
+            },
+            "import os": {
+                "explanation": "Imports OS module for system operations. Common in legitimate software.",
+                "recommendation": "Check how OS functions are used. File operations may need scrutiny.",
+            },
+            "import subprocess": {
+                "explanation": "Imports subprocess for running commands. Common in legitimate software.",
+                "recommendation": "Verify commands are safe and don't accept untrusted input.",
+            },
+            "import requests": {
+                "explanation": "Makes HTTP requests. Common in legitimate API clients.",
+                "recommendation": "Verify destination URLs are expected services.",
+            },
+            "json.dump": {
+                "explanation": "Writes JSON to files. Could write sensitive data.",
+                "recommendation": "Check what data is being written and to where.",
+            },
+            "pickle.load": {
+                "explanation": "Deserializes Python objects. Can execute arbitrary code.",
+                "recommendation": "NEVER unpickle untrusted data. Use JSON for data exchange.",
+            },
+            "base64 encoding/decoding": {
+                "explanation": "Encodes/decodes data. Often used to obfuscate payloads.",
+                "recommendation": "Check if encoded data is being executed or transmitted.",
+            },
+            "pip package installation": {
+                "explanation": "Installs packages at runtime. Could install malicious packages.",
+                "recommendation": "Ensure packages are from trusted sources. This is unusual behavior.",
+            },
+            "npm package installation": {
+                "explanation": "Installs npm packages at runtime. Could install malicious packages.",
+                "recommendation": "Verify package sources. This is unusual behavior.",
+            },
+            "Reverse shell": {
+                "explanation": "Creates a reverse shell for remote access. MALICIOUS.",
+                "recommendation": "DO NOT USE this skill. This is clearly malicious code.",
+            },
+            "keylogger": {
+                "explanation": "Records keystrokes. MALICIOUS.",
+                "recommendation": "DO NOT USE this skill. This is clearly malicious code.",
+            },
+            "credential": {
+                "explanation": "References credentials. Could be stealing or managing credentials.",
+                "recommendation": "Check if credentials are being logged or transmitted.",
+            },
+            "password": {
+                "explanation": "References passwords. Could be stealing or managing passwords.",
+                "recommendation": "Verify password handling is secure and not being exfiltrated.",
+            },
+            "token": {
+                "explanation": "References authentication tokens. Could be stealing or using tokens.",
+                "recommendation": "Check if tokens are being logged or transmitted.",
+            },
+            "api_key": {
+                "explanation": "References API keys. Could be stealing or using API keys.",
+                "recommendation": "Verify API keys are not being logged or transmitted.",
+            },
+            "socket.connect": {
+                "explanation": "Creates network socket connection. Could connect to attacker server.",
+                "recommendation": "Verify the connection destination is legitimate.",
+            },
+            "pty.spawn": {
+                "explanation": "Creates pseudo-terminal. Often used for reverse shells.",
+                "recommendation": "This is suspicious. Verify the purpose of PTY creation.",
+            },
+        }
+
+        # Default explanations by finding type
+        default_explanations = {
+            "dangerous_pattern": {
+                "explanation": "This pattern could be dangerous if abused, but is also common in legitimate software.",
+                "recommendation": "Review the specific code to understand its purpose.",
+            },
+            "malicious_keyword": {
+                "explanation": "This keyword appears in security contexts. Could be malicious or legitimate.",
+                "recommendation": "Check the context - many terms appear in legitimate security tools.",
+            },
+            "sensitive_file_access": {
+                "explanation": "This accesses files that typically contain sensitive data.",
+                "recommendation": "Verify the access is for legitimate purposes and data isn't exfiltrated.",
+            },
+            "network_access": {
+                "explanation": "This makes network calls to external servers.",
+                "recommendation": "Verify the destination is a trusted service.",
+            },
+            "malicious_filename": {
+                "explanation": "This filename contains suspicious keywords.",
+                "recommendation": "Review the file contents carefully.",
+            },
+        }
+
+        # Check for specific pattern match first
+        for key, exp in explanations.items():
+            if key.lower() in pattern.lower() or pattern.lower() in key.lower():
+                return exp
+
+        # Return default for finding type
+        return default_explanations.get(
+            finding_type,
+            {
+                "explanation": "This pattern was detected during security scanning.",
+                "recommendation": "Review the code to determine if it's legitimate.",
+            },
+        )
+
     def _is_code_file(self, path: Path) -> bool:
         code_extensions = {
             ".py",
@@ -411,6 +548,7 @@ class SecurityValidator:
         filename = file_path.name.lower()
         for keyword in self.MALICIOUS_KEYWORDS:
             if keyword in filename:
+                exp = self._get_pattern_explanation(keyword, "malicious_filename")
                 self.findings.append(
                     {
                         "type": "malicious_filename",
@@ -419,6 +557,8 @@ class SecurityValidator:
                         "line": 0,
                         "pattern": f"Suspicious filename contains: {keyword}",
                         "content": file_path.name,
+                        "explanation": exp["explanation"],
+                        "recommendation": exp["recommendation"],
                     }
                 )
                 self.risk_score += 25
@@ -427,6 +567,7 @@ class SecurityValidator:
         line_lower = line.lower()
         for keyword in self.MALICIOUS_KEYWORDS:
             if keyword in line_lower:
+                exp = self._get_pattern_explanation(keyword, "malicious_keyword")
                 self.findings.append(
                     {
                         "type": "malicious_keyword",
@@ -435,6 +576,8 @@ class SecurityValidator:
                         "line": line_num,
                         "pattern": f"Malicious/attack keyword: {keyword}",
                         "content": line.strip()[:100],
+                        "explanation": exp["explanation"],
+                        "recommendation": exp["recommendation"],
                     }
                 )
                 self.risk_score += 20
@@ -442,6 +585,9 @@ class SecurityValidator:
     def _check_sensitive_files(self, line: str, file_path: Path, line_num: int):
         for pattern, description in self.SENSITIVE_FILE_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
+                exp = self._get_pattern_explanation(
+                    description, "sensitive_file_access"
+                )
                 self.findings.append(
                     {
                         "type": "sensitive_file_access",
@@ -450,6 +596,8 @@ class SecurityValidator:
                         "line": line_num,
                         "pattern": description,
                         "content": line.strip()[:100],
+                        "explanation": exp["explanation"],
+                        "recommendation": exp["recommendation"],
                     }
                 )
                 self.risk_score += 15
@@ -457,6 +605,7 @@ class SecurityValidator:
     def _check_patterns(self, line: str, file_path: Path, line_num: int):
         for pattern, description in self.DANGEROUS_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
+                exp = self._get_pattern_explanation(description, "dangerous_pattern")
                 self.findings.append(
                     {
                         "type": "dangerous_pattern",
@@ -465,6 +614,8 @@ class SecurityValidator:
                         "line": line_num,
                         "pattern": description,
                         "content": line.strip()[:100],
+                        "explanation": exp["explanation"],
+                        "recommendation": exp["recommendation"],
                     }
                 )
                 self.risk_score += 10
@@ -480,6 +631,8 @@ class SecurityValidator:
                         "line": line_num,
                         "pattern": "Network URL/connection detected",
                         "content": line.strip()[:100],
+                        "explanation": "This code makes network requests to external servers. Could be exfiltrating data.",
+                        "recommendation": "Verify the destination URLs are legitimate services. Check for unexpected data transmission.",
                     }
                 )
                 self.risk_score += 5
@@ -505,7 +658,66 @@ class SecurityValidator:
             "total_findings": len(self.findings),
             "findings": self.findings,
             "recommendation": self._get_recommendation(),
+            "explanation": self._get_detailed_explanation(),
         }
+
+    def _get_detailed_explanation(self) -> Dict[str, Any]:
+        explanations = {
+            "dangerous_pattern": {
+                "title": "Potentially Dangerous Code Pattern",
+                "description": "This code uses patterns that could be used for malicious purposes if abused. However, these patterns are also commonly used in legitimate software.",
+                "what_to_do": "Review the specific code to understand its purpose. Check if it's essential for the skill's functionality.",
+                "common_false_positives": "OS operations, JSON handling, and network calls are often needed for legitimate purposes.",
+            },
+            "malicious_keyword": {
+                "title": "Suspicious Keyword Detected",
+                "description": "This code contains keywords commonly associated with malware, attack tools, or hacking techniques.",
+                "what_to_do": "Investigate the context. Many of these terms appear in legitimate security tools, tests, and documentation.",
+                "common_false_positives": "Words like 'rig', 'loader', 'proxy' appear in legitimate software names (e.g., Playwright, data loaders).",
+            },
+            "sensitive_file_access": {
+                "title": "Access to Sensitive Files",
+                "description": "This code attempts to access files that typically contain credentials, secrets, or sensitive configuration.",
+                "what_to_do": "Ensure the skill only accesses these files for legitimate purposes. Check if credentials are being exfiltrated.",
+                "common_false_positives": "Reading .env for configuration is common in legitimate apps; ensure it's not sending data elsewhere.",
+            },
+            "network_access": {
+                "title": "Network Communication",
+                "description": "This code makes network requests to external servers.",
+                "what_to_do": "Verify the network destinations are legitimate. Check if data is being sent to unexpected servers.",
+                "common_false_positives": "API calls to known services (Google, GitHub, etc.) are common in legitimate skills.",
+            },
+            "malicious_filename": {
+                "title": "Suspicious Filename",
+                "description": "The filename contains keywords associated with malware or attack tools.",
+                "what_to_do": "This is a strong indicator. Review the file contents carefully before using the skill.",
+                "common_false_positives": "Rare - filenames are less likely to have false positives.",
+            },
+        }
+
+        # Count findings by type
+        by_type = {}
+        for finding in self.findings:
+            ftype = finding.get("type", "unknown")
+            by_type[ftype] = by_type.get(ftype, 0) + 1
+
+        return {
+            "summary_by_type": by_type,
+            "explanations": explanations,
+            "overall_assessment": self._get_assessment_text(),
+        }
+
+    def _get_assessment_text(self) -> str:
+        if self.risk_level == "SAFE":
+            return "No suspicious patterns detected. This skill appears safe for use based on automated analysis."
+        elif self.risk_level == "LOW":
+            return "Minor patterns detected that are commonly used in legitimate software. Manual review recommended but risk appears low."
+        elif self.risk_level == "MEDIUM":
+            return "Several patterns detected that warrant investigation. Review each finding to ensure they're legitimate uses."
+        elif self.risk_level == "HIGH":
+            return "Multiple concerning patterns detected. This skill requires careful manual review before use."
+        else:
+            return "CRITICAL: This skill exhibits multiple high-risk patterns. Strongly recommend NOT using until thoroughly reviewed by a security expert."
 
     def _get_recommendation(self) -> str:
         if self.risk_level == "SAFE":
@@ -632,7 +844,11 @@ def find_skill_by_name(skill_name: str) -> List[Path]:
         if skill_path.exists():
             found_paths.append(skill_path)
 
-        for subdir in base_path.iterdir() if base_path.exists() else []:
+        # Skip if base_path is a file, not a directory
+        if not base_path.exists() or not base_path.is_dir():
+            continue
+
+        for subdir in base_path.iterdir():
             if subdir.is_dir() and subdir.name.lower() == skill_name.lower():
                 found_paths.append(subdir)
 
