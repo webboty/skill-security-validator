@@ -835,22 +835,120 @@ def get_skill_locations():
 
 
 def find_skill_by_name(skill_name: str) -> List[Path]:
-    """Find a skill by name across all known locations."""
-    locations = get_skill_locations()
+    """Find a skill by name across all known locations.
+
+    IMPORTANT: Always search GLOBAL locations first, then project locations.
+    This ensures skills are found regardless of current working directory.
+    """
+    home = get_home_dir()
+    is_windows = sys.platform == "win32"
+    global_locations = []
+    project_locations = []
+
+    if is_windows:
+        userprofile = Path(os.environ.get("USERPROFILE", str(home)))
+        appdata = Path(
+            os.environ.get("APPDATA", str(userprofile / "AppData" / "Roaming"))
+        )
+
+        # GLOBAL locations
+        global_locations.extend(
+            [
+                (userprofile / ".claude" / "skills", "Claude Code (global)"),
+                (userprofile / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
+                (appdata / "opencode" / "skills", "OpenCode config (global)"),
+                (
+                    appdata
+                    / "Code"
+                    / "User"
+                    / "globalStorage"
+                    / "codeium"
+                    / "workspace",
+                    "Codeium (global)",
+                ),
+                (userprofile / ".cursor" / "rules", "Cursor (global)"),
+                (
+                    userprofile / "AppData" / "Local" / "Programs" / "Windsurf",
+                    "Windsurf",
+                ),
+                (userprofile / ".codex" / "skills", "Codex (global)"),
+                (userprofile / ".goose" / "skills", "Goose (global)"),
+                (userprofile / ".letta" / "skills", "Letta (global)"),
+                (userprofile / ".gemini" / "cli" / "skills", "Gemini CLI (global)"),
+                (userprofile / ".kilocode" / "skills", "KiloCode (global)"),
+            ]
+        )
+
+        # PROJECT locations - from current directory
+        project_locations.extend(
+            [
+                (get_cwd() / ".claude" / "skills", "Claude Code (project)"),
+                (get_cwd() / ".agents" / "skills", "OpenCode/OpenClaw (project)"),
+                (get_cwd() / ".opencode" / "skills", "OpenCode (project)"),
+                (get_cwd() / ".cursor" / "rules", "Cursor (project)"),
+                (get_cwd() / ".windsurf" / "skills.json", "Windsurf (project)"),
+                (get_cwd() / ".github" / "skills", "GitHub (project)"),
+                (get_cwd() / ".codex" / "skills", "Codex (project)"),
+            ]
+        )
+    else:
+        # macOS/Linux GLOBAL locations
+        global_locations.extend(
+            [
+                (home / ".claude" / "skills", "Claude Code (global)"),
+                (home / ".agents" / "skills", "OpenCode/OpenClaw (global)"),
+                (home / ".config" / "opencode" / "skills", "OpenCode config (global)"),
+                (home / ".cursor" / "rules", "Cursor (global)"),
+                (home / ".windsurf" / "skills.json", "Windsurf (global)"),
+                (home / ".codex" / "skills", "Codex (global)"),
+                (home / ".goose" / "skills", "Goose (global)"),
+                (home / ".letta" / "skills", "Letta (global)"),
+                (home / ".gemini" / "cli" / "skills", "Gemini CLI (global)"),
+                (home / ".kilocode" / "skills", "KiloCode (global)"),
+            ]
+        )
+
+        # PROJECT locations
+        project_locations.extend(
+            [
+                (get_cwd() / ".claude" / "skills", "Claude Code (project)"),
+                (get_cwd() / ".agents" / "skills", "OpenCode/OpenClaw (project)"),
+                (get_cwd() / ".opencode" / "skills", "OpenCode (project)"),
+                (get_cwd() / ".cursor" / "rules", "Cursor (project)"),
+                (get_cwd() / ".windsurf" / "skills.json", "Windsurf (project)"),
+                (get_cwd() / ".github" / "skills", "GitHub (project)"),
+                (get_cwd() / ".codex" / "skills", "Codex (project)"),
+            ]
+        )
+
     found_paths = []
 
-    for base_path, location_name in locations:
+    # FIRST: Search all GLOBAL locations
+    for base_path, location_name in global_locations:
+        if not base_path.exists() or not base_path.is_dir():
+            continue
+
         skill_path = base_path / skill_name
         if skill_path.exists():
             found_paths.append(skill_path)
 
-        # Skip if base_path is a file, not a directory
-        if not base_path.exists() or not base_path.is_dir():
-            continue
-
         for subdir in base_path.iterdir():
             if subdir.is_dir() and subdir.name.lower() == skill_name.lower():
                 found_paths.append(subdir)
+
+    # SECOND: Search project locations only if not found globally
+    if not found_paths:
+        for base_path, location_name in project_locations:
+            if not base_path.exists() or not base_path.is_dir():
+                continue
+
+            skill_path = base_path / skill_name
+            if skill_path.exists():
+                found_paths.append(skill_path)
+
+            for subdir in base_path.iterdir():
+                if subdir.is_dir() and subdir.name.lower() == skill_name.lower():
+                    found_paths.append(subdir)
 
     return found_paths
 
