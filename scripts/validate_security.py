@@ -687,15 +687,42 @@ class SecurityValidator:
             ),
         ]
 
-        # Check if target is a directory with SKILL.md
+        # Check all relevant skill files for bad instructions
         target_path = Path(self.target_path)
         if target_path.is_dir():
-            skill_md_path = target_path / "SKILL.md"
-            if skill_md_path.exists():
+            # Files to check (text-based that could contain instructions)
+            check_extensions = {
+                ".md",
+                ".txt",
+                ".yaml",
+                ".yml",
+                ".json",
+                ".py",
+                ".js",
+                ".ts",
+            }
+            # Files to SKIP (contain real credentials)
+            skip_names = {".env", "credentials", "secrets", "config.json", ".env.local"}
+
+            for file_path in target_path.rglob("*"):
+                if not file_path.is_file():
+                    continue
+                # Skip files that might contain real credentials
+                if any(skip in file_path.name.lower() for skip in skip_names):
+                    continue
+                # Only check text-based files
+                if file_path.suffix.lower() not in check_extensions:
+                    continue
+                # Skip node_modules, .git, etc.
+                if any(part.startswith(".") for part in file_path.parts):
+                    if (
+                        ".claude" not in file_path.parts
+                        and ".agents" not in file_path.parts
+                    ):
+                        continue
+
                 try:
-                    with open(
-                        skill_md_path, "r", encoding="utf-8", errors="ignore"
-                    ) as f:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read()
 
                     for pattern, description in prompt_dangerous_patterns:
@@ -704,12 +731,12 @@ class SecurityValidator:
                             line_num = content[: match.start()].count("\n") + 1
                             skill_md_issues.append(
                                 {
-                                    "file": str(skill_md_path),
+                                    "file": str(file_path.relative_to(target_path)),
                                     "line": line_num,
                                     "pattern": description,
                                     "content": content[
                                         max(0, match.start() - 30) : match.end() + 30
-                                    ],
+                                    ][:200],
                                 }
                             )
                 except Exception:
@@ -720,8 +747,42 @@ class SecurityValidator:
     def _generate_report(self) -> Dict[str, Any]:
         smart_analysis = self._analyze_findings_context()
 
-        # Analyze SKILL.md for prompt injection/bad instructions
+        # Analyze ALL skill files for prompt injection/bad instructions
         skill_md_issues = self._analyze_skill_md()
+
+        # Determine what checks were performed
+        checks_performed = {
+            "code_patterns": True,  # Always done via scanning
+            "network_calls": True,  # Always done via scanning
+            "sensitive_files": True,  # Always done via scanning
+            "skill_instructions": True,  # Now done for all skill files
+            "skill_md_analysis": len(skill_md_issues),  # Count of issues found
+        }
+
+        # Determine what CAN be done as follow-up (not yet done or deeper)
+        potential_followups = []
+
+        # Library verification - only if libraries found and not verified
+        if smart_analysis.get("potential_libraries"):
+            potential_followups.append(
+                {
+                    "id": "web_search",
+                    "title": "Web search to verify libraries are legitimate",
+                    "description": f"Check if {[lib for lib in smart_analysis['potential_libraries'][:3]]} are known safe packages",
+                    "why": "Some libraries may be typosquatting or malicious packages",
+                }
+            )
+
+        # Package scan - only if skill installs packages
+        if any("install" in str(f.get("content", "")).lower() for f in self.findings):
+            potential_followups.append(
+                {
+                    "id": "scan_package",
+                    "title": "Scan the installed Python/npm package",
+                    "description": "Download and scan the actual package this skill installs",
+                    "why": "The skill itself may be safe, but the package it installs could be malicious",
+                }
+            )
 
         # Cap the displayed score at 100
         displayed_score = min(self.risk_score, 100)
@@ -732,13 +793,15 @@ class SecurityValidator:
             "risk_score": displayed_score,
             "total_findings": len(self.findings),
             "findings": self.findings,
-            "skill_md_analysis": {
+            "checks_performed": checks_performed,
+            "skill_instructions_analysis": {
                 "issues_found": len(skill_md_issues),
-                "issues": skill_md_issues,
+                "issues": skill_md_issues[:10],  # Limit to first 10
             },
             "recommendation": self._get_recommendation(),
             "explanation": self._get_detailed_explanation(),
             "smart_analysis": smart_analysis,
+            "potential_followups": potential_followups,
         }
 
     def _get_detailed_explanation(self) -> Dict[str, Any]:
@@ -910,13 +973,91 @@ class SecurityValidator:
                     matches[:1]
                 )  # First import is usually the main library
 
+        # Filter out Python standard library modules
+        stdlib_modules = {
+            "os",
+            "sys",
+            "json",
+            "re",
+            "time",
+            "datetime",
+            "math",
+            "random",
+            "collections",
+            "itertools",
+            "functools",
+            "operator",
+            "string",
+            "logging",
+            "warnings",
+            "threading",
+            "multiprocessing",
+            "asyncio",
+            "subprocess",
+            "platform",
+            "pathlib",
+            "typing",
+            "abc",
+            "copy",
+            "io",
+            "tempfile",
+            "shutil",
+            "glob",
+            "fnmatch",
+            "argparse",
+            "configparser",
+            "csv",
+            "sqlite3",
+            "zipfile",
+            "tarfile",
+            "html",
+            "xml",
+            "urllib",
+            "http",
+            "ftplib",
+            "smtplib",
+            "poplib",
+            "imaplib",
+            "socket",
+            "ssl",
+            "email",
+            "base64",
+            "hashlib",
+            "hmac",
+            "secrets",
+            "cryptography",
+            "pickle",
+            "marshal",
+            "ast",
+            "dis",
+            "inspect",
+            "traceback",
+            "gc",
+            "weakref",
+            "types",
+            "contextlib",
+            "dataclasses",
+            "enum",
+            "graphlib",
+            "pprint",
+            "textwrap",
+            "unittest",
+            "doctest",
+            "pdb",
+        }
+
+        # Filter to only external libraries
+        external_libs = [
+            lib for lib in library_names if lib.lower() not in stdlib_modules
+        ]
+
         return {
             "original_risk_level": self.risk_level,
             "original_risk_score": self.risk_score,
             "adjusted_risk_level": adjusted_level,
             "adjusted_risk_score": adjusted_score,
             "context_notes": context_notes,
-            "potential_libraries": list(library_names)[:5],  # Max 5
+            "potential_libraries": external_libs[:5],  # Max 5
             "is_documentation_heavy": is_documentation_heavy,
             "false_positive_ratio": false_positive_count / max(len(self.findings), 1),
         }

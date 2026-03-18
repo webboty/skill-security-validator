@@ -106,25 +106,39 @@ If yes, search for the library to check:
 
 If yes, use webfetch or download the package and run validate_security.py on it.
 
-**Option 3: Deep Dive - Check SKILL.md Instructions**
-> "Would you like me to check the SKILL.md file itself for malicious instructions or prompt injection?"
+## 4. How to Present Results (DYNAMIC!)
 
-This checks if the skill's instructions try to:
-- Make the AI ignore its rules
-- Extract sensitive information
-- Perform unauthorized actions
-- Manipulate the AI's behavior
+The validator returns a `potential_followups` array - ONLY ask about items that are IN this array!
 
-**Option 4: Review Source Code**
-> "Would you like me to examine the main Python/JavaScript source files for suspicious code?"
+### If potential_followups is EMPTY:
+Simply state:
+```
+✅ All automated checks complete. This skill appears [SAFE/RISKY].
+No further checks recommended at this time.
+```
 
-Read the core files (client.py, main.py, index.js, etc.) and check for:
-- Unexpected network calls
-- Credential handling
-- File system operations
-- Shell command execution
+### If potential_followups has items:
+Present ONLY those options that make sense:
 
-## 4. Security Recommendations
+```
+🔍 Further verification available:
+[For each item in potential_followups]:
+[X]. [title]
+    [description]
+    Why: [why this might matter]
+
+Just say the number!
+```
+
+## 5. What Was Already Checked
+
+The report includes `checks_performed` showing what was already done:
+- code_patterns: ✅ Always done
+- network_calls: ✅ Always done  
+- sensitive_files: ✅ Always done
+- skill_instructions: ✅ Now done for ALL skill files (SKILL.md, references/, assets/, etc.)
+
+## 6. Security Recommendations
 Based on findings, provide actionable advice:
 - If CRITICAL: Strongly recommend NOT using until expert review
 - If HIGH: Suggest manual code review
@@ -140,26 +154,26 @@ Based on findings, provide actionable advice:
 [Risk Level]: [Score]/100
 
 📝 Summary:
-- Python files scanned: [X]
-- Findings: [X] total ([type breakdown])
-- SKILL.md issues: [X]
+- Files scanned: [X]
+- Code findings: [X] 
+- Skill instruction issues: [X]
 
-🔍 What was checked:
+🔍 What was checked (all done automatically):
 - ✅ Code patterns (subprocess, eval, etc.)
 - ✅ Network calls  
 - ✅ Sensitive file access
-- ✅ SKILL.md prompt injection
+- ✅ ALL skill files for prompt injection
 
 ⚠️ Assessment:
-[Plain language explanation of findings and why likely safe/risky]
+[Plain language explanation]
 
 ✅ VERDICT: This skill appears [SAFE/RISKY] to use.
 
-What would you like me to do next?
-1. Web search to verify [library names] are legitimate
-2. Scan the installed Python/npm package
-3. Check SKILL.md for malicious instructions (prompt injection)
-4. Deep dive into source code files
+[If potential_followups has items]:
+🔍 Want more verification?
+1. [first option from potential_followups]
+2. [second option...]
 
-Just say the number!
+Just say the number (or "none" if done)!
+```
 ```
