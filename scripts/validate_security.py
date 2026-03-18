@@ -1468,146 +1468,214 @@ def main():
             validator = SecurityValidator(str(unique_found[0]))
             report = validator.analyze()
 
-            # Print human-readable summary with smart analysis
-            print("\n" + "=" * 60)
-            print("SECURITY SCAN RESULTS")
-            print("=" * 60)
+            # Print comprehensive human-readable summary
+            _print_single_report(report, skill_name)
 
-            sa = report.get("smart_analysis", {})
-            print(
-                f"\n📊 Raw Risk Score: {sa.get('original_risk_score', report.get('risk_score'))}/100 ({sa.get('original_risk_level', report.get('risk_level'))})"
-            )
-
-            if sa.get("adjusted_risk_score") is not None:
-                print(
-                    f"📊 Adjusted Risk: {sa.get('adjusted_risk_score')}/100 ({sa.get('adjusted_risk_level')})"
-                )
-
-            # Print context notes
-            for note in sa.get("context_notes", []):
-                print(f"\n{note}")
-
-            # Print recommendation
-            print(f"\n💡 Recommendation: {report.get('recommendation')}")
-
-            # Check for potential libraries to verify
-            libraries = sa.get("potential_libraries", [])
-            if libraries:
-                print(f"\n🔍 Potential libraries detected: {', '.join(libraries)}")
-                print(
-                    "   → Would you like me to web search to verify these are legitimate?"
-                )
-
-            print("\n" + "=" * 60)
-
-        else:
-            print(f"\nScanning ALL {len(unique_found)} instances...")
-            all_reports = []
-            all_smart_analyses = []
-            all_potential_libraries = set()
-
-            for f in unique_found:
-                validator = SecurityValidator(str(f))
-                report = validator.analyze()
-
-                all_reports.append(
-                    {
-                        "path": str(f),
-                        "risk_level": report["risk_level"],
-                        "risk_score": report["risk_score"],
-                        "findings_count": report["total_findings"],
-                        "recommendation": report["recommendation"],
-                    }
-                )
-
-                # Collect smart analysis
-                sa = report.get("smart_analysis", {})
-                all_smart_analyses.append(sa)
-                all_potential_libraries.update(sa.get("potential_libraries", []))
-
-            # Print combined report with smart analysis
-            combined = {
-                "skill_name": skill_name,
-                "total_instances": len(unique_found),
-                "instances_scanned": all_reports,
-                "summary": {
-                    "safe": sum(1 for r in all_reports if r["risk_level"] == "SAFE"),
-                    "low": sum(1 for r in all_reports if r["risk_level"] == "LOW"),
-                    "medium": sum(
-                        1 for r in all_reports if r["risk_level"] == "MEDIUM"
-                    ),
-                    "high": sum(1 for r in all_reports if r["risk_level"] == "HIGH"),
-                    "critical": sum(
-                        1 for r in all_reports if r["risk_level"] == "CRITICAL"
-                    ),
-                },
-            }
-
-            highest_risk = max(all_reports, key=lambda x: x["risk_score"])
-            combined["overall_risk_level"] = highest_risk["risk_level"]
-            combined["overall_risk_score"] = highest_risk["risk_score"]
-            combined["recommendation"] = highest_risk["recommendation"]
-
-            # Add smart analysis to combined
-            combined["smart_analysis"] = {
-                "all_context_notes": [
-                    sa.get("context_notes", []) for sa in all_smart_analyses
-                ],
-                "potential_libraries": list(all_potential_libraries)[:5],
-            }
-
-            # Print human-readable summary
-            print("\n" + "=" * 60)
-            print("SECURITY SCAN RESULTS")
-            print("=" * 60)
-
-            print(
-                f"\n📊 Raw Risk Score: {combined['overall_risk_score']}/100 ({combined['overall_risk_level']})"
-            )
-
-            # Print context notes from first report
-            for sa in all_smart_analyses:
-                for note in sa.get("context_notes", []):
-                    print(f"\n{note}")
-
-            print(f"\n💡 Recommendation: {combined['recommendation']}")
-
-            # Check for potential libraries to verify
-            if all_potential_libraries:
-                print(
-                    f"\n🔍 Potential libraries detected: {', '.join(list(all_potential_libraries)[:5])}"
-                )
-                print(
-                    "   → Would you like me to web search to verify these are legitimate?"
-                )
-
-            print("\n" + "=" * 60)
-
-            # Print full JSON
-            print(json.dumps(combined, indent=2))
-
-            if combined["overall_risk_level"] in ["HIGH", "CRITICAL"]:
-                sys.exit(2)
-            elif combined["overall_risk_level"] == "MEDIUM":
-                sys.exit(1)
-            else:
-                sys.exit(0)
             return
 
-        print(json.dumps(report, indent=2))
+        # Multiple instances
+        print(f"\nScanning ALL {len(unique_found)} instances...")
+        all_reports = []
+        all_skill_analysis = []
 
-        if report.get("risk_level") in ["HIGH", "CRITICAL"]:
+        for f in unique_found:
+            validator = SecurityValidator(str(f))
+            report = validator.analyze()
+
+            all_reports.append(
+                {
+                    "path": str(f),
+                    "risk_level": report["risk_level"],
+                    "risk_score": report["risk_score"],
+                    "findings_count": report["total_findings"],
+                    "recommendation": report["recommendation"],
+                }
+            )
+            all_skill_analysis.append(report)
+
+        highest_risk = max(all_reports, key=lambda x: x["risk_score"])
+
+        # Print combined report
+        print("\n" + "=" * 65)
+        print("║               SECURITY SCAN RESULTS                       ║")
+        print("╚═══════════════════════════════════════════════════════════╝")
+
+        print(f"\n📦 Skill: {skill_name}")
+        print(f"📍 Locations scanned: {len(unique_found)}")
+
+        # Show what was checked
+        first_report = all_skill_analysis[0]
+        checks = first_report.get("checks_performed", {})
+        skill_analysis = first_report.get("skill_instructions_analysis", {})
+
+        print(f"\n┌─────────────────────────────────────────────────────────┐")
+        print(f"│  SCRIPT SCAN RESULTS (automated)                        │")
+        print(f"├─────────────────────────────────────────────────────────┤")
+        print(
+            f"│  Risk Level:    {highest_risk['risk_level']:<10}                          │"
+        )
+        print(
+            f"│  Risk Score:    {highest_risk['risk_score']}/100                              │"
+        )
+        print(
+            f"│  Code Issues:   {highest_risk['findings_count']:<4} findings                           │"
+        )
+        print(
+            f"│  Instructions:  {len(skill_analysis.get('files_checked', []))} files checked, {skill_analysis.get('issues_found', 0)} issues       │"
+        )
+        print(f"└─────────────────────────────────────────────────────────┘")
+
+        # What checks were performed
+        print(f"\n✅ Script Checks Performed:")
+        print(f"   • Code patterns (subprocess, eval, exec, etc.)")
+        print(f"   • Network calls (HTTP requests, sockets)")
+        print(f"   • Sensitive file access (.env, credentials)")
+        print(f"   • ALL skill files for malicious instructions")
+
+        # Files checked
+        files_checked = skill_analysis.get("files_checked", [])
+        if files_checked:
+            print(f"\n📂 Files checked for bad instructions:")
+            for f in files_checked[:10]:
+                print(f"   - {f}")
+            if len(files_checked) > 10:
+                print(f"   ... and {len(files_checked) - 10} more")
+
+        # Issues found
+        issues_found = skill_analysis.get("issues_found", 0)
+        if issues_found > 0:
+            print(f"\n⚠️  BAD INSTRUCTIONS FOUND:")
+            for issue in skill_analysis.get("issues", [])[:3]:
+                print(f"   - {issue['file']}:{issue['line']} - {issue['pattern']}")
+
+        # Context notes
+        for sa in [s.get("smart_analysis", {}) for s in all_skill_analysis]:
+            for note in sa.get("context_notes", []):
+                print(f"\n🤖 LLM Assessment:")
+                print(f"   {note}")
+
+        print(f"\n💡 Recommendation: {highest_risk['recommendation']}")
+
+        # Show JSON for reference
+        combined = {
+            "skill_name": skill_name,
+            "total_instances": len(unique_found),
+            "instances_scanned": all_reports,
+            "overall_risk_level": highest_risk["risk_level"],
+            "overall_risk_score": highest_risk["risk_score"],
+            "checks_performed": checks,
+            "skill_instructions_analysis": skill_analysis,
+        }
+
+        print("\n" + "-" * 65)
+        print(json.dumps(combined, indent=2))
+
+        if highest_risk["risk_level"] in ["HIGH", "CRITICAL"]:
             sys.exit(2)
-        elif report.get("risk_level") == "MEDIUM":
+        elif highest_risk["risk_level"] == "MEDIUM":
             sys.exit(1)
         else:
             sys.exit(0)
         return
 
-    validator = SecurityValidator(target)
-    report = validator.analyze()
 
+def _print_single_report(report, skill_name=None):
+    """Print a single skill report in a nice format."""
+    skill_name = skill_name or Path(report.get("target_path", "")).name
+
+    print("\n" + "=" * 65)
+    print("║               SECURITY SCAN RESULTS                       ║")
+    print("╚═══════════════════════════════════════════════════════════╝")
+
+    print(f"\n📦 Skill: {skill_name}")
+    print(f"📍 Location: {report.get('target_path', 'unknown')}")
+
+    # Get checks performed
+    checks = report.get("checks_performed", {})
+    skill_analysis = report.get("skill_instructions_analysis", {})
+    sa = report.get("smart_analysis", {})
+
+    print(f"\n┌─────────────────────────────────────────────────────────┐")
+    print(f"│  SCRIPT SCAN RESULTS (automated)                        │")
+    print(f"├─────────────────────────────────────────────────────────┤")
+    print(
+        f"│  Risk Level:    {report.get('risk_level', 'UNKNOWN'):<10}                          │"
+    )
+    print(
+        f"│  Risk Score:    {report.get('risk_score', 0)}/100                              │"
+    )
+    print(
+        f"│  Code Issues:   {report.get('total_findings', 0):<4} findings                           │"
+    )
+    print(
+        f"│  Instructions:  {len(skill_analysis.get('files_checked', []))} files checked, {skill_analysis.get('issues_found', 0)} issues       │"
+    )
+    print(f"└─────────────────────────────────────────────────────────┘")
+
+    # What was checked
+    print(f"\n✅ Script Checks Performed:")
+    print(f"   • Code patterns (subprocess, eval, exec, etc.)")
+    print(f"   • Network calls (HTTP requests, sockets)")
+    print(f"   • Sensitive file access (.env, credentials)")
+    print(f"   • ALL skill files for malicious instructions")
+
+    # Files checked for instructions
+    files_checked = skill_analysis.get("files_checked", [])
+    if files_checked:
+        print(f"\n📂 Files checked for bad instructions:")
+        for f in files_checked[:10]:
+            print(f"   - {f}")
+        if len(files_checked) > 10:
+            print(f"   ... and {len(files_checked) - 10} more")
+
+    # Issues found in instructions
+    issues_found = skill_analysis.get("issues_found", 0)
+    if issues_found > 0:
+        print(f"\n⚠️  BAD INSTRUCTIONS FOUND:")
+        for issue in skill_analysis.get("issues", [])[:3]:
+            print(f"   - {issue['file']}:{issue['line']} - {issue['pattern']}")
+    else:
+        print(f"\n✅ No malicious instructions found in skill files")
+
+    # Code issues found (script flagged these)
+    findings = report.get("findings", [])
+    if findings:
+        print(f"\n🔍 Code Issues Found (script flagged these):")
+        for f in findings[:5]:
+            print(
+                f"   - {f.get('type')}: {f.get('pattern')} in {Path(f.get('file', '')).name}:{f.get('line')}"
+            )
+        if len(findings) > 5:
+            print(f"   ... and {len(findings) - 5} more issues")
+
+    # LLM Assessment
+    print(f"\n🤖 LLM ASSESSMENT (human investigation):")
+    if sa.get("context_notes"):
+        for note in sa.get("context_notes", []):
+            print(f"   {note}")
+    else:
+        print(f"   No additional context notes")
+
+    print(f"\n💡 Recommendation: {report.get('recommendation', 'No recommendation')}")
+
+    # Followups
+    followups = report.get("potential_followups", [])
+    if followups:
+        print(f"\n🔍 Further verification available:")
+        for i, fu in enumerate(followups, 1):
+            print(f"   {i}. {fu.get('title')}")
+            print(f"      {fu.get('description')}")
+
+    # JSON output
+    print("\n" + "-" * 65)
     print(json.dumps(report, indent=2))
+
+    if report.get("risk_level") in ["HIGH", "CRITICAL"]:
+        sys.exit(2)
+    elif report.get("risk_level") == "MEDIUM":
+        sys.exit(1)
+    else:
+        sys.exit(0)
 
 
 if __name__ == "__main__":

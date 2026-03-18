@@ -130,50 +130,70 @@ Present ONLY those options that make sense:
 Just say the number!
 ```
 
-## 5. What Was Already Checked
+## 5. How Script + LLM Work TOGETHER
 
-The report includes `checks_performed` showing what was already done:
-- code_patterns: ✅ Always done
-- network_calls: ✅ Always done  
-- sensitive_files: ✅ Always done
-- skill_instructions: ✅ Now done for ALL skill files (SKILL.md, references/, assets/, etc.)
+The scanner and LLM are a TEAM! The script:
+- ✅ Finds potential issues (this is GOOD - it's doing its job)
+- ✅ Reports them with context
+- ✅ The LLM then investigates each finding
 
-## 6. Security Recommendations
-Based on findings, provide actionable advice:
-- If CRITICAL: Strongly recommend NOT using until expert review
-- If HIGH: Suggest manual code review
-- If MEDIUM: Note what patterns were found and why they're likely safe/risky
-- If SAFE: Confirm it's likely safe to use
+IMPORTANT: When findings are flagged as "false positives", this doesn't mean the scanner failed! It means:
+- The script correctly identified patterns that COULD be risky
+- The LLM investigated and found they are LEGITIMATE uses
+- This is exactly how it should work!
 
-## Example Response Template
+## 6. Example Response Template
 
 ```
-📊 SECURITY SCAN COMPLETE
+╔══════════════════════════════════════════════════════════════╗
+║                    SECURITY SCAN COMPLETE                      ║
+╚══════════════════════════════════════════════════════════════╝
 
-[Skill Name]: [path]
-[Risk Level]: [Score]/100
+Skill: [name]
+Location: [path]
 
-📝 Summary:
-- Files scanned: [X]
-- Code findings: [X] 
-- Skill instruction issues: [X]
+┌─────────────────────────────────────────────────────────────┐
+│  SCRIPT SCAN RESULTS (automated)                            │
+├─────────────────────────────────────────────────────────────┤
+│  Risk Level:    [LEVEL]                                     │
+│  Risk Score:    [SCORE]/100                                 │
+│  Code Issues:   [X] findings                               │
+│  Instructions:  [X] files checked, [Y] issues found        │
+└─────────────────────────────────────────────────────────────┘
 
-🔍 What was checked (all done automatically):
-- ✅ Code patterns (subprocess, eval, etc.)
-- ✅ Network calls  
-- ✅ Sensitive file access
-- ✅ ALL skill files for prompt injection
+📋 Script Checks Performed:
+  ✅ Code patterns (subprocess, eval, exec, etc.)
+  ✅ Network calls (HTTP requests, sockets)
+  ✅ Sensitive file access (.env, credentials)
+  ✅ ALL skill files for malicious instructions
 
-⚠️ Assessment:
-[Plain language explanation]
+📂 Files checked for bad instructions:
+  - SKILL.md
+  - references/*.md
+  - scripts/*.py
+  - [all files...]
 
-✅ VERDICT: This skill appears [SAFE/RISKY] to use.
+[If issues found in instructions]:
+⚠️ BAD INSTRUCTIONS FOUND:
+  - [file]: [issue description]
 
-[If potential_followups has items]:
-🔍 Want more verification?
-1. [first option from potential_followups]
-2. [second option...]
+[If code issues found]:
+🔍 Code Issues Found (script flagged these):
+  - [type]: [pattern] in [file]:[line]
+  - [explanation from script]
 
-Just say the number (or "none" if done)!
+🤖 LLM VERDICTION (human investigation):
+[Plain language explanation of what the findings actually mean]
+[Why they are/are not a real concern]
+[Context about what the skill actually does]
+
+✅ VERDICT: [SAFE / CAUTION / UNSAFE]
+
+[If potential_followups]:
+🔍 Further verification available:
+1. [option 1]
+2. [option 2]
+
+Just say the number (or "done")!
 ```
 ```
