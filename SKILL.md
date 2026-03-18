@@ -106,10 +106,23 @@ If yes, search for the library to check:
 
 If yes, use webfetch or download the package and run validate_security.py on it.
 
-**Option 3: Review Source Code**
-> "Would you like me to read the main source files to check for suspicious code?"
+**Option 3: Deep Dive - Check SKILL.md Instructions**
+> "Would you like me to check the SKILL.md file itself for malicious instructions or prompt injection?"
 
-If yes, glob for `.py`, `.js` files and read the main entry points.
+This checks if the skill's instructions try to:
+- Make the AI ignore its rules
+- Extract sensitive information
+- Perform unauthorized actions
+- Manipulate the AI's behavior
+
+**Option 4: Review Source Code**
+> "Would you like me to examine the main Python/JavaScript source files for suspicious code?"
+
+Read the core files (client.py, main.py, index.js, etc.) and check for:
+- Unexpected network calls
+- Credential handling
+- File system operations
+- Shell command execution
 
 ## 4. Security Recommendations
 Based on findings, provide actionable advice:
@@ -123,19 +136,30 @@ Based on findings, provide actionable advice:
 ```
 📊 SECURITY SCAN COMPLETE
 
+[Skill Name]: [path]
 [Risk Level]: [Score]/100
 
-Findings:
-- [List key findings in plain language]
+📝 Summary:
+- Python files scanned: [X]
+- Findings: [X] total ([type breakdown])
+- SKILL.md issues: [X]
 
-Context: [Explain if findings are likely false positives]
+🔍 What was checked:
+- ✅ Code patterns (subprocess, eval, etc.)
+- ✅ Network calls  
+- ✅ Sensitive file access
+- ✅ SKILL.md prompt injection
 
-⚠️ This skill appears to be [SAFE/RISKY] based on the analysis.
+⚠️ Assessment:
+[Plain language explanation of findings and why likely safe/risky]
 
-Follow-up options:
-1. Web search to verify [library names]
-2. Scan the installed package
-3. Review source code manually
+✅ VERDICT: This skill appears [SAFE/RISKY] to use.
 
 What would you like me to do next?
+1. Web search to verify [library names] are legitimate
+2. Scan the installed Python/npm package
+3. Check SKILL.md for malicious instructions (prompt injection)
+4. Deep dive into source code files
+
+Just say the number!
 ```

@@ -639,25 +639,103 @@ class SecurityValidator:
                 break
 
     def _calculate_risk(self):
-        if self.risk_score == 0:
+        # Cap risk score at 100
+        capped_score = min(self.risk_score, 100)
+
+        if capped_score == 0:
             self.risk_level = "SAFE"
-        elif self.risk_score < 10:
+        elif capped_score < 10:
             self.risk_level = "LOW"
-        elif self.risk_score < 30:
+        elif capped_score < 30:
             self.risk_level = "MEDIUM"
-        elif self.risk_score < 50:
+        elif capped_score < 50:
             self.risk_level = "HIGH"
         else:
             self.risk_level = "CRITICAL"
 
+    def _analyze_skill_md(self):
+        """Analyze SKILL.md for malicious prompts/instructions."""
+        skill_md_issues = []
+
+        # Patterns that might indicate malicious prompts
+        prompt_dangerous_patterns = [
+            (
+                r"ignore\s+(previous|all|above)\s+(instructions?|rules?|prompts?)",
+                "Prompt injection attempt - telling AI to ignore instructions",
+            ),
+            (
+                r"forget\s+(everything|all|previous)",
+                "Prompt injection - telling AI to forget context",
+            ),
+            (r"new\s+instructions?:", "Potential instruction override"),
+            (r"#\s*system", "System prompt manipulation"),
+            (r"you\s+are\s+now", "Role manipulation attempt"),
+            (r"pretend\s+to\s+be", "Roleplaying bypass attempt"),
+            (r"bypass\s+(safety|restriction|filter)", "Safety bypass attempt"),
+            (r"disable\s+(safety|filter|protection)", "Disabling safety measures"),
+            (r"malicious", "Mentions malicious intent"),
+            (r"steal\s+(data|credentials|information)", "Data theft instruction"),
+            (r"exfiltrat", "Data exfiltration instruction"),
+            (r"send\s+.*\s+(to\s+)?(me|my|external)", "Data sending instruction"),
+            (r"write\s+.*\s+(to\s+)?disk", "Disk write instruction"),
+            (r"execute\s+.*\s+(shell|command|script)", "Command execution instruction"),
+            (r"run\s+.*\s+(shell|command)", "Command execution instruction"),
+            (r"download\s+.*\s+(and\s+)?execute", "Download and execute instruction"),
+            (
+                r"install\s+.*\s+(malware|virus|trojan)",
+                "Malware installation instruction",
+            ),
+        ]
+
+        # Check if target is a directory with SKILL.md
+        target_path = Path(self.target_path)
+        if target_path.is_dir():
+            skill_md_path = target_path / "SKILL.md"
+            if skill_md_path.exists():
+                try:
+                    with open(
+                        skill_md_path, "r", encoding="utf-8", errors="ignore"
+                    ) as f:
+                        content = f.read()
+
+                    for pattern, description in prompt_dangerous_patterns:
+                        matches = re.finditer(pattern, content, re.IGNORECASE)
+                        for match in matches:
+                            line_num = content[: match.start()].count("\n") + 1
+                            skill_md_issues.append(
+                                {
+                                    "file": str(skill_md_path),
+                                    "line": line_num,
+                                    "pattern": description,
+                                    "content": content[
+                                        max(0, match.start() - 30) : match.end() + 30
+                                    ],
+                                }
+                            )
+                except Exception:
+                    pass
+
+        return skill_md_issues
+
     def _generate_report(self) -> Dict[str, Any]:
         smart_analysis = self._analyze_findings_context()
+
+        # Analyze SKILL.md for prompt injection/bad instructions
+        skill_md_issues = self._analyze_skill_md()
+
+        # Cap the displayed score at 100
+        displayed_score = min(self.risk_score, 100)
+
         return {
             "target_path": str(self.target_path),
             "risk_level": self.risk_level,
-            "risk_score": self.risk_score,
+            "risk_score": displayed_score,
             "total_findings": len(self.findings),
             "findings": self.findings,
+            "skill_md_analysis": {
+                "issues_found": len(skill_md_issues),
+                "issues": skill_md_issues,
+            },
             "recommendation": self._get_recommendation(),
             "explanation": self._get_detailed_explanation(),
             "smart_analysis": smart_analysis,
