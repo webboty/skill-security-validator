@@ -105,14 +105,21 @@ python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py 
 
 ### Install
 
-**Option 1: One-line install (Recommended)**
+**Option 1: Git clone (Recommended)**
 ```bash
-npx skill add webboty/skill-security-validator
+# For OpenCode
+git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
+
+# For Claude Code
+git clone https://github.com/webboty/skill-security-validator.git ~/.claude/skills/skill-security-validator
+
+# For any agent (adjust path as needed)
+git clone https://github.com/webboty/skill-security-validator.git ~/.agents/skills/skill-security-validator
 ```
 
-**Option 2: Manual install**
+**Option 2: Download only (no git)**
 ```bash
-git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
+curl -L https://github.com/webboty/skill-security-validator/archive/refs/heads/main.tar.gz | tar xz -C ~/.opencode/skill/ && mv ~/.opencode/skill/skill-security-validator-main ~/.opencode/skill/skill-security-validator
 ```
 
 ### Validate Any Skill
@@ -173,17 +180,11 @@ The validator automatically scans skills from **all major AI agents** across **a
 
 ### For OpenCode (Recommended)
 ```bash
-npx skill add webboty/skill-security-validator
-```
-
-Or manually:
-```bash
 git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
 ```
 
 ### For Claude Code
 ```bash
-# Clone to Claude Code skills folder
 git clone https://github.com/webboty/skill-security-validator.git ~/.claude/skills/skill-security-validator
 ```
 Then use it with `/skill-security-validator` in Claude Code.
@@ -193,9 +194,10 @@ Then use it with `/skill-security-validator` in Claude Code.
 git clone https://github.com/webboty/skill-security-validator.git ~/.cursor/rules/skill-security-validator
 ```
 
-### For All Agents (using openskills)
+### For Generic Agents
 ```bash
-npx openskills install webboty/skill-security-validator
+# Adjust the path to your agent's skill folder
+git clone https://github.com/webboty/skill-security-validator.git /path/to/your/agent/skills/skill-security-validator
 ```
 
 ---
