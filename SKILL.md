@@ -1,6 +1,6 @@
 ---
 name: skill-security-validator
-description: Validates third-party skills and scripts for security vulnerabilities, malicious code patterns, and suspicious behavior. Use when: (1) Installing or auditing new 3rd party skills from external sources, (2) Reviewing scripts before execution, (3) Checking skills for dangerous patterns like shell execution, network calls, credential access, or file system manipulation, (4) Performing security audits on AI agent capabilities.
+description: Validates third-party skills and scripts for security vulnerabilities and malicious code patterns before installation.
 license: MIT
 compatibility: Requires Python 3.x
 metadata:
