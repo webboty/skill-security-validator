@@ -31,7 +31,12 @@ You MUST do BOTH of these every time:
 
 ### Part 1: Run the automated scanner (script)
 ```bash
-python3 .opencode/skill/skill-security-validator/scripts/validate_security.py <skill-name>
+python3 ~/.agents/skills/skill-security-validator/scripts/validate_security.py <skill-name>
+```
+
+Or if installed in project:
+```bash
+python3 .agents/skills/skill-security-validator/scripts/validate_security.py <skill-name>
 ```
 
 **The script will show you:**
@@ -82,12 +87,12 @@ You MUST read:
 The script scans ALL files in the skill for:
 
 ```bash
-python3 .opencode/skill/skill-security-validator/scripts/validate_security.py <path-to-skill-or-script>
+python3 ~/.agents/skills/skill-security-validator/scripts/validate_security.py <path-to-skill-or-script>
 ```
 
 Or by skill name:
 ```bash
-python3 .opencode/skill/skill-security-validator/scripts/validate_security.py notebooklm
+python3 ~/.agents/skills/skill-security-validator/scripts/validate_security.py notebooklm
 ```
 
 ## What It Checks

@@ -96,7 +96,7 @@ OpenCode will automatically use the skill-security-validator to scan and report 
 
 ### Option 3: Direct Command
 ```bash
-python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py /path/to/skill
+python3 ~/.agents/skills/skill-security-validator/scripts/validate_security.py /path/to/skill
 ```
 
 ---
@@ -105,26 +105,23 @@ python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py 
 
 ### Install
 
-**Option 1: Git clone (Recommended)**
+**Option 1: One-line install (Recommended)**
 ```bash
-# For OpenCode
-git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
+npx skills add webboty/skill-security-validator
+```
+
+**Option 2: Git clone**
+```bash
+# For global use (works with all agents)
+git clone https://github.com/webboty/skill-security-validator.git ~/.agents/skills/skill-security-validator
 
 # For Claude Code
 git clone https://github.com/webboty/skill-security-validator.git ~/.claude/skills/skill-security-validator
-
-# For any agent (adjust path as needed)
-git clone https://github.com/webboty/skill-security-validator.git ~/.agents/skills/skill-security-validator
-```
-
-**Option 2: Download only (no git)**
-```bash
-curl -L https://github.com/webboty/skill-security-validator/archive/refs/heads/main.tar.gz | tar xz -C ~/.opencode/skill/ && mv ~/.opencode/skill/skill-security-validator-main ~/.opencode/skill/skill-security-validator
 ```
 
 ### Validate Any Skill
 ```bash
-python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py /path/to/skill-to-validate
+python3 ~/.agents/skills/skill-security-validator/scripts/validate_security.py /path/to/skill-to-validate
 ```
 
 **Before installing ANY new skill, run the validator first!**
