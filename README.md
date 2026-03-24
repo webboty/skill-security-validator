@@ -104,6 +104,13 @@ python3 ~/.opencode/skill/skill-security-validator/scripts/validate_security.py 
 ## ⚡ Quick Start
 
 ### Install
+
+**Option 1: One-line install (Recommended)**
+```bash
+npx skill add webboty/skill-security-validator
+```
+
+**Option 2: Manual install**
 ```bash
 git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
 ```
@@ -164,17 +171,22 @@ The validator automatically scans skills from **all major AI agents** across **a
 
 ## 🤖 Installing for Different AI Agents
 
+### For OpenCode (Recommended)
+```bash
+npx skill add webboty/skill-security-validator
+```
+
+Or manually:
+```bash
+git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
+```
+
 ### For Claude Code
 ```bash
 # Clone to Claude Code skills folder
 git clone https://github.com/webboty/skill-security-validator.git ~/.claude/skills/skill-security-validator
 ```
 Then use it with `/skill-security-validator` in Claude Code.
-
-### For OpenCode
-```bash
-git clone https://github.com/webboty/skill-security-validator.git ~/.opencode/skill/skill-security-validator
-```
 
 ### For Cursor
 ```bash
